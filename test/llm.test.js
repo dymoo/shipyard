@@ -79,6 +79,76 @@ test('request body carries the tunables the endpoint is expected to support', ()
   assert.deepEqual(body.response_format, { type: 'json_object' });
 });
 
+test('a timed-out logical request is not duplicated', async () => {
+  let now = 0;
+  let requests = 0;
+  const timeout = new Error('request timed out');
+  timeout.name = 'TimeoutError';
+  const llm = new LLM(
+    { ...base, requestTimeoutMs: 100 },
+    {
+      fetch: async () => {
+        requests++;
+        now = 100;
+        throw timeout;
+      },
+      now: () => now,
+      sleep: async () => assert.fail('a timed-out request must not sleep or retry'),
+      timeoutSignal: () => new AbortController().signal,
+    },
+  );
+
+  await assert.rejects(() => llm.send([{ role: 'user', content: 'hi' }]), /100ms logical deadline/);
+  assert.equal(requests, 1);
+});
+
+test('a transient network failure retries within the shared deadline', async () => {
+  let now = 0;
+  let requests = 0;
+  const llm = new LLM(
+    { ...base, requestTimeoutMs: 10_000 },
+    {
+      fetch: async () => {
+        requests++;
+        if (requests === 1) throw new Error('connection reset');
+        return Response.json({ choices: [{ message: { content: 'ok' } }] });
+      },
+      now: () => now,
+      sleep: async (ms) => {
+        now += ms;
+      },
+      timeoutSignal: () => new AbortController().signal,
+    },
+  );
+
+  assert.deepEqual(await llm.send([{ role: 'user', content: 'hi' }]), {
+    message: { content: 'ok' },
+  });
+  assert.equal(requests, 2);
+  assert.ok(now > 0 && now < 10_000);
+});
+
+test('a retry delay that exceeds the shared deadline fails closed', async () => {
+  let now = 0;
+  let requests = 0;
+  const llm = new LLM(
+    { ...base, requestTimeoutMs: 100 },
+    {
+      fetch: async () => {
+        requests++;
+        now = 99;
+        return new Response('busy', { status: 503 });
+      },
+      now: () => now,
+      sleep: async () => assert.fail('the retry cannot fit inside the deadline'),
+      timeoutSignal: () => new AbortController().signal,
+    },
+  );
+
+  await assert.rejects(() => llm.send([{ role: 'user', content: 'hi' }]), /100ms logical deadline/);
+  assert.equal(requests, 1);
+});
+
 test('sends a json schema as response_format when a schema is passed', () => {
   const llm = new LLM(base);
   const schema = { type: 'object', properties: { a: { type: 'string' } }, required: ['a'] };
