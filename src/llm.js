@@ -109,6 +109,7 @@ export class LLM {
       if (this.runtime.now() >= deadline) throw requestDeadlineError(this.config.requestTimeoutMs);
       if (res.ok) {
         const data = /** @type {any} */ (await res.json());
+        if (this.runtime.now() >= deadline) throw requestDeadlineError(this.config.requestTimeoutMs);
         this.usage.requests++;
         this.usage.prompt += data?.usage?.prompt_tokens || 0;
         this.usage.completion += data?.usage?.completion_tokens || 0;

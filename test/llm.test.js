@@ -105,6 +105,7 @@ test('a timed-out logical request is not duplicated', async () => {
 test('a transient network failure retries within the shared deadline', async () => {
   let now = 0;
   let requests = 0;
+  const timeoutBudgets = [];
   const llm = new LLM(
     { ...base, requestTimeoutMs: 10_000 },
     {
@@ -117,7 +118,10 @@ test('a transient network failure retries within the shared deadline', async () 
       sleep: async (ms) => {
         now += ms;
       },
-      timeoutSignal: () => new AbortController().signal,
+      timeoutSignal: (remainingMs) => {
+        timeoutBudgets.push(remainingMs);
+        return new AbortController().signal;
+      },
     },
   );
 
@@ -126,6 +130,29 @@ test('a transient network failure retries within the shared deadline', async () 
   });
   assert.equal(requests, 2);
   assert.ok(now > 0 && now < 10_000);
+  assert.equal(timeoutBudgets.length, 2);
+  assert.equal(timeoutBudgets[0], 10_000);
+  assert.ok(timeoutBudgets[1] < timeoutBudgets[0]);
+});
+
+test('response decoding must finish inside the shared deadline', async () => {
+  let now = 0;
+  const llm = new LLM(
+    { ...base, requestTimeoutMs: 100 },
+    {
+      fetch: async () => ({
+        ok: true,
+        json: async () => {
+          now = 100;
+          return { choices: [{ message: { content: 'too late' } }] };
+        },
+      }),
+      now: () => now,
+      timeoutSignal: () => new AbortController().signal,
+    },
+  );
+
+  await assert.rejects(() => llm.send([{ role: 'user', content: 'hi' }]), /100ms logical deadline/);
 });
 
 test('a retry delay that exceeds the shared deadline fails closed', async () => {
