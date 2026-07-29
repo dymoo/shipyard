@@ -2,7 +2,14 @@ import * as core from './core.js';
 import { readConfig, readEvent, severityRank } from './config.js';
 import { GitHub } from './github.js';
 import { parseDiff, anchorFinding, lineText } from './diff.js';
-import { selectFiles, renderFile, buildChunks, sliceAround, estimateTokens } from './context.js';
+import {
+  selectFiles,
+  renderFile,
+  buildChunks,
+  assertCompleteReviewContext,
+  sliceAround,
+  estimateTokens,
+} from './context.js';
 import { LLM } from './llm.js';
 import { findFindings, refuteFinding } from './review.js';
 import { mergeFindings, fingerprint, collectFingerprints } from './findings.js';
@@ -31,9 +38,10 @@ async function main() {
 
   core.info(`Reviewing ${ctx.owner}/${ctx.repo}#${ctx.prNumber} with ${config.model}`);
   core.info(`${files.length} changed files, ${selected.length} to review, ${skipped.length} skipped`);
+  assertCompleteReviewContext({ skipped });
 
   if (!selected.length) {
-    const summary = renderSummary(emptyResult(pr), config);
+    const summary = renderSummary(emptyResult(pr, skipped), config);
     core.appendSummary(summary);
     await upsertSummary(gh, ctx, summary);
     setOutputs(true, 0);
@@ -74,6 +82,7 @@ async function main() {
 
     rendered = selected.flatMap((file, index) => renderFile(file, contents[index], config));
     ({ chunks, dropped } = buildChunks(rendered, config));
+    assertCompleteReviewContext({ rendered, dropped });
     core.info(
       `Prepared ${chunks.length} request(s), ~${chunks.reduce((total, chunk) => total + chunk.tokens, 0)} tokens${
         dropped.length ? `, ${dropped.length} file(s) dropped for budget` : ''
@@ -222,13 +231,13 @@ function setOutputs(reviewed, findings) {
   core.setOutput('findings', String(findings));
 }
 
-function emptyResult(pr) {
+function emptyResult(pr, skipped) {
   return {
     pr,
     anchored: [],
     demoted: [],
     duplicates: 0,
-    skipped: [],
+    skipped,
     dropped: [],
     summaries: ['No reviewable changes in this pull request.'],
     refuted: 0,

@@ -59,16 +59,16 @@ export function selectFiles(files, config) {
   const selected = [];
   const skipped = [];
   for (const file of files) {
+    if (matchAny(file.path, config.ignore)) {
+      skipped.push({ path: file.path, reason: 'ignored' });
+      continue;
+    }
     if (file.binary) {
       skipped.push({ path: file.path, reason: 'binary' });
       continue;
     }
     if (file.hunks.length === 0) {
       skipped.push({ path: file.path, reason: 'no textual changes' });
-      continue;
-    }
-    if (matchAny(file.path, config.ignore)) {
-      skipped.push({ path: file.path, reason: 'ignored' });
       continue;
     }
     if (selected.length >= config.maxFiles) {
@@ -149,7 +149,7 @@ export function renderRows(rows) {
 
 /**
  * Render one file into one or more text blocks, each within `chunkTokens`.
- * @returns {{path: string, text: string, tokens: number}[]}
+ * @returns {{path: string, text: string, tokens: number, truncated?: boolean}[]}
  */
 export function renderFile(file, content, config) {
   const newLines = content === null || content === undefined ? null : splitLines(content);
@@ -182,7 +182,7 @@ export function renderFile(file, content, config) {
         Math.floor((config.chunkTokens - estimateTokens(prefix) - estimateTokens(suffix) - 2) * 4),
       );
       const text = `${prefix}${section.slice(0, keep)}\n${suffix}`;
-      blocks.push({ path: file.path, text, tokens: estimateTokens(text) });
+      blocks.push({ path: file.path, text, tokens: estimateTokens(text), truncated: true });
       continue;
     }
     if (currentTokens + t > budget) flush();
@@ -225,6 +225,25 @@ export function buildChunks(rendered, config) {
   }
   flush();
   return { chunks, dropped };
+}
+
+/**
+ * A green review must mean every non-ignored textual change reached the model.
+ * The action used to report skipped/truncated/dropped material only in its
+ * summary while still emitting reviewed=true. That makes the status unusable
+ * as a required safety gate.
+ */
+export function assertCompleteReviewContext({ skipped = [], rendered = [], dropped = [] }) {
+  const incomplete = skipped.filter((item) => item.reason !== 'ignored');
+  const truncatedPaths = [...new Set(rendered.filter((block) => block.truncated).map((block) => block.path))];
+  const failures = [
+    ...incomplete.map((item) => `${item.path}: ${item.reason}`),
+    ...truncatedPaths.map((path) => `${path}: hunk exceeded the per-request token budget`),
+    ...dropped.map((item) => `${item.path}: ${item.reason}`),
+  ];
+  if (failures.length > 0) {
+    throw new Error(`Review context is incomplete:\n- ${failures.join('\n- ')}`);
+  }
 }
 
 /**

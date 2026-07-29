@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { GitHub } from '../src/github.js';
 import { openRepo } from '../src/repo.js';
 import { fingerprint } from '../src/findings.js';
-import { APP_DIFF, APP_CONTENT } from './fixtures.js';
+import { APP_DIFF, BINARY_DIFF, APP_CONTENT } from './fixtures.js';
 
 const ENTRY = fileURLToPath(new URL('../src/index.js', import.meta.url));
 
@@ -62,6 +62,17 @@ function makeTarball(files, symlinks = {}) {
   return data;
 }
 
+function addedFileDiff(filePath, content) {
+  return [
+    `diff --git a/${filePath} b/${filePath}`,
+    'new file mode 100644',
+    '--- /dev/null',
+    `+++ b/${filePath}`,
+    '@@ -0,0 +1,1 @@',
+    `+${content}`,
+  ].join('\n');
+}
+
 const REPO_FILES = {
   'src/app.js': APP_CONTENT,
   'src/db.js': 'export const db = {\n  get(id) { return rows[id]; }, // undefined when missing\n};\n',
@@ -97,6 +108,7 @@ function standardReply({ findings = FINDINGS, verdict = 'real' } = {}) {
  *   rejectTools?: boolean,
  *   repoFiles?: Record<string, string>,
  *   baseRepoFiles?: Record<string, string>,
+ *   diffText?: string,
  *   symlinks?: Record<string, string>,
  *   issueComments?: any[],
  *   reviewComments?: any[]
@@ -107,6 +119,7 @@ async function stubServer({
   rejectTools = false,
   repoFiles = REPO_FILES,
   baseRepoFiles = BASE_REPO_FILES,
+  diffText = APP_DIFF,
   symlinks = {},
   issueComments = [],
   reviewComments = [],
@@ -153,7 +166,7 @@ async function stubServer({
         });
       }
       if (url.pathname === '/repos/o/r/pulls/1' && req.method === 'GET') {
-        if ((req.headers.accept || '').includes('diff')) return send(200, APP_DIFF, 'text/plain');
+        if ((req.headers.accept || '').includes('diff')) return send(200, diffText, 'text/plain');
         return send(200, {
           number: 1,
           state: 'open',
@@ -389,6 +402,73 @@ test('a pull request symlink cannot read outside the extracted repository', asyn
   assert.equal(await repo.read('src/leak.js'), null);
   assert.equal(await repo.read('../../../etc/passwd'), null);
   assert.match(await repo.read('src/db.js'), /undefined when missing/);
+});
+
+test('a binary pull request change fails instead of claiming complete review coverage', async (t) => {
+  const { server, captured, port } = await stubServer({
+    diffText: BINARY_DIFF,
+    repoFiles: { 'README.md': 'binary-only review fixture\n' },
+  });
+  t.after(() => server.close());
+
+  const run = await runAction(port);
+  assert.notEqual(run.code, 0);
+  assert.match(`${run.stdout}\n${run.stderr}`, /Review context is incomplete:[\s\S]*logo\.png: binary/);
+  assert.equal(captured.llmRequests.length, 0);
+  assert.deepEqual(run.outputs, {});
+});
+
+test('an oversized hunk fails before any model request or reviewed output', async (t) => {
+  const source = 'x'.repeat(121_000);
+  const { server, captured, port } = await stubServer({
+    diffText: addedFileDiff('oversized.js', source),
+    repoFiles: { 'oversized.js': source },
+  });
+  t.after(() => server.close());
+
+  const run = await runAction(port);
+  assert.notEqual(run.code, 0);
+  assert.match(`${run.stdout}\n${run.stderr}`, /oversized\.js: hunk exceeded the per-request token budget/);
+  assert.equal(captured.llmRequests.length, 0);
+  assert.deepEqual(run.outputs, {});
+});
+
+test('total token exhaustion fails before any model request or reviewed output', async (t) => {
+  /** @type {Record<string, string>} */
+  const repoFiles = {};
+  const diffs = [];
+  for (let index = 0; index < 5; index++) {
+    const filePath = `large-${index}.js`;
+    const source = String(index).repeat(100_000);
+    repoFiles[filePath] = source;
+    diffs.push(addedFileDiff(filePath, source));
+  }
+  const { server, captured, port } = await stubServer({
+    diffText: diffs.join('\n'),
+    repoFiles,
+  });
+  t.after(() => server.close());
+
+  const run = await runAction(port);
+  assert.notEqual(run.code, 0);
+  assert.match(`${run.stdout}\n${run.stderr}`, /large-4\.js: over max-input-tokens \(120000\)/);
+  assert.equal(captured.llmRequests.length, 0);
+  assert.deepEqual(run.outputs, {});
+});
+
+test('an ignored-only change remains visible in the successful sticky summary', async (t) => {
+  const { server, captured, port } = await stubServer({
+    diffText: addedFileDiff('pnpm-lock.yaml', 'lockfileVersion: 9'),
+    repoFiles: { 'pnpm-lock.yaml': 'lockfileVersion: 9' },
+  });
+  t.after(() => server.close());
+
+  const run = await runAction(port);
+  assert.equal(run.code, 0, `action failed:\n${run.stdout}\n${run.stderr}`);
+  assert.equal(captured.llmRequests.length, 0);
+  assert.equal(run.outputs.reviewed, 'true');
+  assert.match(captured.createdComments[0].body, /Not reviewed \(1\)/);
+  assert.match(captured.createdComments[0].body, /`pnpm-lock\.yaml` — ignored/);
 });
 
 test('an unrelated event is skipped without spending a model request', async (t) => {

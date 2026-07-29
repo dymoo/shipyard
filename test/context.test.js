@@ -7,6 +7,7 @@ import {
   selectFiles,
   renderFile,
   buildChunks,
+  assertCompleteReviewContext,
   sliceAround,
   estimateTokens,
 } from '../src/context.js';
@@ -38,7 +39,7 @@ test('default ignores catch lockfiles and build output', () => {
 
 test('selectFiles reports why each file was skipped', () => {
   const files = parseDiff([APP_DIFF, BINARY_DIFF].join('\n'));
-  const { selected, skipped } = selectFiles(files, { ...CONFIG, ignore: ['**/*.png'] });
+  const { selected, skipped } = selectFiles(files, { ...CONFIG, ignore: [] });
   assert.deepEqual(
     selected.map((f) => f.path),
     ['src/app.js'],
@@ -47,11 +48,41 @@ test('selectFiles reports why each file was skipped', () => {
   assert.equal(skipped[0].reason, 'binary');
 });
 
+test('an explicit ignore remains intentional even when the file is binary', () => {
+  const files = parseDiff(BINARY_DIFF);
+  const { selected, skipped } = selectFiles(files, {
+    ...CONFIG,
+    ignore: ['**/*.png'],
+  });
+  assert.deepEqual(selected, []);
+  assert.deepEqual(skipped, [{ path: 'logo.png', reason: 'ignored' }]);
+  assert.doesNotThrow(() => assertCompleteReviewContext({ skipped }));
+});
+
 test('max-files is reported rather than silently applied', () => {
   const files = parseDiff(APP_DIFF);
   const capped = selectFiles(files, { ...CONFIG, maxFiles: 0 });
   assert.equal(capped.selected.length, 0);
   assert.match(capped.skipped[0].reason, /max-files/);
+});
+
+test('review coverage fails closed for every non-ignored skipped file', () => {
+  assert.doesNotThrow(() =>
+    assertCompleteReviewContext({
+      skipped: [{ path: 'pnpm-lock.yaml', reason: 'ignored' }],
+    }),
+  );
+  assert.throws(
+    () =>
+      assertCompleteReviewContext({
+        skipped: [
+          { path: 'logo.png', reason: 'binary' },
+          { path: 'rename-only.js', reason: 'no textual changes' },
+          { path: 'over-limit.js', reason: 'over max-files (60)' },
+        ],
+      }),
+    /logo\.png: binary[\s\S]*rename-only\.js: no textual changes[\s\S]*over-limit\.js: over max-files/,
+  );
 });
 
 test('rendering widens each hunk with real source and keeps both line numbers correct', () => {
@@ -102,6 +133,11 @@ test('one oversized hunk is truncated within the advertised request budget', () 
   const [block] = renderFile(file, source, { ...CONFIG, contextLines: 0, chunkTokens: 1000 });
   assert.ok(block.tokens <= 1000, `block of ${block.tokens} tokens exceeds the request budget`);
   assert.match(block.text, /hunk truncated/);
+  assert.equal(block.truncated, true);
+  assert.throws(
+    () => assertCompleteReviewContext({ rendered: [block] }),
+    /huge\.js: hunk exceeded the per-request token budget/,
+  );
 });
 
 test('chunking packs blocks up to the request budget and drops over the total budget', () => {
@@ -119,6 +155,10 @@ test('chunking packs blocks up to the request budget and drops over the total bu
   const budgeted = buildChunks(blocks, { chunkTokens: 2500, maxInputTokens: 2000 });
   assert.equal(budgeted.dropped.length, 4);
   assert.match(budgeted.dropped[0].reason, /max-input-tokens/);
+  assert.throws(
+    () => assertCompleteReviewContext({ dropped: budgeted.dropped }),
+    /f2\.js: over max-input-tokens \(2000\)/,
+  );
 });
 
 test('sliceAround centres on the requested line', () => {

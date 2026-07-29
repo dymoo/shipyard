@@ -106,6 +106,12 @@ ceiling and upgrade path records a deliberate trade-off.
 Outputs are `reviewed` (`true` or `false`) and `findings` (the number that
 survived verification).
 
+`reviewed=true` is fail-closed coverage evidence. The action fails instead of
+setting it when a non-ignored file has no textual diff, is binary, exceeds the
+file limit, contains a hunk over the per-request token budget, or is dropped
+after the total input budget is exhausted. Deliberately ignored paths remain
+listed in the sticky summary.
+
 Example project guidance:
 
 ```yaml
