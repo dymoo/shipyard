@@ -18,8 +18,14 @@
 import * as core from './core.js';
 
 export class LLM {
-  constructor(config) {
+  constructor(config, runtime = {}) {
     this.config = config;
+    this.runtime = {
+      fetch: runtime.fetch ?? ((input, init) => globalThis.fetch(input, init)),
+      now: runtime.now ?? (() => Date.now()),
+      sleep: runtime.sleep ?? core.sleep,
+      timeoutSignal: runtime.timeoutSignal ?? ((ms) => AbortSignal.timeout(ms)),
+    };
     // Identifies this client in findings and in the summary footer.
     this.label = config.label || config.model;
     this.quirks = {
@@ -70,15 +76,18 @@ export class LLM {
    */
   async send(messages, options = {}) {
     const url = `${this.config.baseUrl}/chat/completions`;
+    const deadline = this.runtime.now() + this.config.requestTimeoutMs;
     let attempt = 0;
     let networkRetries = 0;
 
     for (;;) {
+      const remainingMs = deadline - this.runtime.now();
+      if (remainingMs <= 0) throw requestDeadlineError(this.config.requestTimeoutMs);
       const builtAt = this.quirksVersion;
       const body = this.buildBody(messages, options);
       let res;
       try {
-        res = await fetch(url, {
+        res = await this.runtime.fetch(url, {
           method: 'POST',
           headers: {
             authorization: `Bearer ${this.config.apiKey}`,
@@ -86,16 +95,21 @@ export class LLM {
             'user-agent': 'commitreview',
           },
           body: JSON.stringify(body),
-          signal: AbortSignal.timeout(this.config.requestTimeoutMs),
+          signal: this.runtime.timeoutSignal(remainingMs),
         });
       } catch (err) {
-        if (networkRetries++ >= 3) throw new Error(`Model request failed: ${err.message}`, { cause: err });
-        await core.sleep(core.backoff(networkRetries));
+        if (isRequestAbort(err) || this.runtime.now() >= deadline) {
+          throw requestDeadlineError(this.config.requestTimeoutMs, err);
+        }
+        if (networkRetries++ >= 3) throw new Error(`Model request failed: ${errorMessage(err)}`, { cause: err });
+        await this.waitForRetry(core.backoff(networkRetries), deadline, err);
         continue;
       }
 
+      if (this.runtime.now() >= deadline) throw requestDeadlineError(this.config.requestTimeoutMs);
       if (res.ok) {
         const data = /** @type {any} */ (await res.json());
+        if (this.runtime.now() >= deadline) throw requestDeadlineError(this.config.requestTimeoutMs);
         this.usage.requests++;
         this.usage.prompt += data?.usage?.prompt_tokens || 0;
         this.usage.completion += data?.usage?.completion_tokens || 0;
@@ -112,8 +126,9 @@ export class LLM {
       if (res.status === 429 || res.status >= 500) {
         if (networkRetries++ >= 3) throw new Error(`Model request failed: ${res.status} ${truncate(text)}`);
         const after = Number(res.headers.get('retry-after'));
-        await core.sleep(
+        await this.waitForRetry(
           Number.isFinite(after) && after > 0 ? Math.min(after, 60) * 1000 : core.backoff(networkRetries),
+          deadline,
         );
         continue;
       }
@@ -145,6 +160,13 @@ export class LLM {
       }
       throw new Error(`Model request failed: ${res.status} ${truncate(text)}`);
     }
+  }
+
+  async waitForRetry(delayMs, deadline, cause) {
+    const remainingMs = deadline - this.runtime.now();
+    if (remainingMs <= delayMs) throw requestDeadlineError(this.config.requestTimeoutMs, cause);
+    await this.runtime.sleep(delayMs);
+    if (this.runtime.now() >= deadline) throw requestDeadlineError(this.config.requestTimeoutMs, cause);
   }
 
   /** Drop or rename whatever the endpoint just complained about. @returns {boolean} changed */
@@ -224,6 +246,18 @@ export class LLM {
     if (second === null) core.warning(`Model ${label} still unparseable; treating as empty.`);
     return second;
   }
+}
+
+function isRequestAbort(error) {
+  return error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError');
+}
+
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function requestDeadlineError(timeoutMs, cause) {
+  return new Error(`Model request exceeded its ${timeoutMs}ms logical deadline.`, { cause });
 }
 
 /**

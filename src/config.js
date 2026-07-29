@@ -64,7 +64,7 @@ const LIMITS = {
   minSeverity: 'low',
   temperature: 0.1,
   maxOutputTokens: 16000,
-  requestTimeoutMs: 180000,
+  requestTimeoutMs: 600000,
 };
 
 export function readConfig() {

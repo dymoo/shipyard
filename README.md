@@ -144,6 +144,15 @@ It must support OpenAI-style function tools. Tool calling is required: an
 endpoint that rejects tools fails clearly rather than producing a diff-only
 review that looks complete.
 
+Each logical non-streaming model call has one fixed ten-minute deadline shared
+across all attempts. A timeout or abort is terminal and is never duplicated;
+fast connection failures, 429s and 5xx responses retry only while their request
+and backoff fit inside the remaining budget. Consumer workflow jobs must leave
+enough time for the complete multi-call review, and proxies must not impose a
+shorter upstream deadline. The larger bound is intentional for high-reasoning
+models; the shared deadline and workflow timeout remain the outer backstops for
+a stalled provider.
+
 Structured Outputs are used when supported. Endpoints vary on
 `response_format`, `max_tokens` and `temperature`, so commitreview adapts those
 optional parameters when an endpoint explicitly rejects them. Tool calling is

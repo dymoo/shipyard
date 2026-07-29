@@ -88,6 +88,7 @@ test('configuration has six public inputs and no URL fallback', () => {
   assert.equal(config.baseUrl, 'https://models.example/v1');
   assert.equal(config.githubApiUrl, 'https://github.example/api/v3');
   assert.equal(config.instructions, 'Use integer pence.');
+  assert.equal(config.requestTimeoutMs, 600000);
   assert.ok(config.ignore.includes('private/**'));
 
   const withoutBase = { ...values };
