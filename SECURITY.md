@@ -16,6 +16,15 @@ runner's secret masker immediately after they are read. The model key is sent
 only to `base-url` in an `Authorization` header. There is no default or fallback
 model endpoint.
 
+**OpenRouter routing.** When `base-url` is exactly
+`https://openrouter.ai/api/v1`, every request requires an OpenRouter endpoint
+with data collection denied and Zero Data Retention enabled. It also requires
+support for all request parameters. If no matching endpoint is available, the
+review fails rather than relaxing those constraints or falling back to another
+model. Other configured endpoints receive no OpenRouter-specific routing
+fields, including proxies that happen to implement an OpenRouter-compatible
+interface.
+
 **Data sent to the model.** A review can send the pull request title,
 description and focused mention; changed hunks and surrounding source;
 repository instruction documents from the base commit; and non-ignored
@@ -65,5 +74,5 @@ runs `src/index.js` directly on Node 20, so the audited source is the executed
 source. Pin an immutable release when required:
 
 ```yaml
-- uses: dymoo/commitreview@v2.0.0
+- uses: dymoo/commitreview@v2.0.1
 ```
