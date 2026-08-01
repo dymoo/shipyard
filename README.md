@@ -15,7 +15,7 @@ The v2 product is deliberately narrow:
 - six inputs, with review limits owned by the action
 
 There is no hosted service, checkout, runtime dependency or bundled `dist/`.
-`action.yml` runs the audited source in `src/` directly on Node 20.
+Both actions run their audited source directly on Node 20.
 
 ## Quick start
 
@@ -163,14 +163,60 @@ It must support OpenAI-style function tools. Tool calling is required: an
 endpoint that rejects tools fails clearly rather than producing a diff-only
 review that looks complete.
 
-Each logical non-streaming model call has one fixed ten-minute deadline shared
-across all attempts. A timeout or abort is terminal and is never duplicated;
-fast connection failures, 429s and 5xx responses retry only while their request
-and backoff fit inside the remaining budget. Consumer workflow jobs must leave
-enough time for the complete multi-call review, and proxies must not impose a
-shorter upstream deadline. The larger bound is intentional for high-reasoning
-models; the shared deadline and workflow timeout remain the outer backstops for
-a stalled provider.
+### OpenRouter preflight
+
+Repositories that send private source through OpenRouter can put the companion
+preflight immediately before the review step:
+
+```yaml
+- uses: dymoo/commitreview/preflight@v2.0.2
+  with:
+    api-key: ${{ secrets.OPENROUTER_API_KEY }}
+    required-models: |
+      openai/gpt-5.6-luna
+      deepseek/deepseek-v4-flash-0731
+    model: deepseek/deepseek-v4-flash-0731
+    key-limit-usd: ${{ vars.OPENROUTER_KEY_LIMIT_USD }}
+    key-limit-reset: daily
+
+- uses: dymoo/commitreview@v2.0.2
+  with:
+    api-key: ${{ secrets.OPENROUTER_API_KEY }}
+    base-url: https://openrouter.ai/api/v1
+    model: deepseek/deepseek-v4-flash-0731
+```
+
+The preflight sends no repository content. It verifies the current key's exact
+spending limit and reset interval, requires `/models/user` to expose exactly the
+declared model allowlist, requires a current ZDR endpoint for the test model,
+and completes a forced synthetic tool call with the same strict provider policy
+used by the review. Put it directly before the review so key rotation or policy
+drift fails before source leaves GitHub Actions. Configure the exact model
+allowlist with an API-key-scoped
+[OpenRouter guardrail](https://openrouter.ai/docs/guides/features/guardrails/overview);
+an unrestricted key is rejected because
+[`/models/user`](https://openrouter.ai/docs/api/api-reference/models/list-models-user)
+exposes additional models.
+
+For a source-free one-off diagnostic, set `diagnostic-provider` to an OpenRouter
+provider slug. The preflight disables fallback and reports either a successful
+strict route or a documented zero-attempt “no allowed providers” result from
+[router metadata](https://openrouter.ai/docs/guides/features/router-metadata).
+The latter proves that the named provider is ineligible under the complete
+effective route policy; it does not guess which account, guardrail, privacy, or
+provider constraint caused the exclusion. Transient provider failures are
+errors, not eligibility evidence. Every preflight request has its own
+120-second deadline and is attempted once; rerun the workflow to collect fresh
+evidence after an operational failure.
+
+In the review action, each logical non-streaming model call has one fixed
+ten-minute deadline shared across all attempts. A timeout or abort is terminal
+and is never duplicated; fast connection failures, 429s and 5xx responses retry
+only while their request and backoff fit inside the remaining budget. Consumer
+workflow jobs must leave enough time for the complete multi-call review, and
+proxies must not impose a shorter upstream deadline. The larger bound is
+intentional for high-reasoning models; the shared deadline and workflow timeout
+remain the outer backstops for a stalled provider.
 
 Structured Outputs are used when supported. Endpoints vary on
 `response_format`, `max_tokens` and `temperature`, so commitreview adapts those
@@ -249,5 +295,6 @@ APIs.
 | `src/github.js`   | GitHub REST client                            |
 | `src/post.js`     | Comment and sticky-summary rendering          |
 | `src/core.js`     | Small dependency-free Actions runtime adapter |
+| `preflight/`      | Source-free OpenRouter policy and route proof |
 
 Licensed under [MIT](LICENSE).

@@ -8,13 +8,16 @@ Do not open a public issue for an exploitable report.
 ## Threat model
 
 commitreview runs inside GitHub Actions. There is no hosted service or
-telemetry. It makes network requests to exactly two configured authorities:
-GitHub's API and the required `base-url`.
+telemetry. The review action makes network requests to exactly two configured
+authorities: GitHub's API and the required `base-url`. The optional preflight
+has one fixed authority, `https://openrouter.ai/api/v1`, and never contacts
+GitHub or a consumer-configured endpoint.
 
 **Credentials.** The model API key and GitHub token are registered with the
-runner's secret masker immediately after they are read. The model key is sent
-only to `base-url` in an `Authorization` header. There is no default or fallback
-model endpoint.
+runner's secret masker immediately after they are read. The review model key is
+sent only to `base-url` in an `Authorization` header; the preflight key is sent
+only to its fixed OpenRouter authority. There is no default or fallback model
+endpoint.
 
 **OpenRouter routing.** When `base-url` is exactly
 `https://openrouter.ai/api/v1`, every request requires an OpenRouter endpoint
@@ -24,6 +27,16 @@ review fails rather than relaxing those constraints or falling back to another
 model. Other configured endpoints receive no OpenRouter-specific routing
 fields, including proxies that happen to implement an OpenRouter-compatible
 interface.
+
+The optional `preflight/` action is a source-free fail-closed gate for
+OpenRouter consumers. It validates the live API key's exact spend limit and
+reset interval, effective model allowlist, current ZDR endpoint availability,
+and a strict synthetic tool route. Run it directly before the source-bearing
+review step so replacing the secret cannot silently reuse an earlier result.
+Its optional single-provider diagnostic reports strict-route ineligibility only
+when OpenRouter returns its documented 404 with zero-attempt routing metadata.
+That result does not attribute the exclusion to any single guardrail or privacy
+setting. Provider outages and ambiguous errors fail the preflight.
 
 **Data sent to the model.** A review can send the pull request title,
 description and focused mention; changed hunks and surrounding source;
@@ -69,10 +82,10 @@ requests changes. Reviews use the `COMMENT` event.
 
 ## Supply chain
 
-There are no runtime dependencies and no bundled build output. `action.yml`
-runs `src/index.js` directly on Node 20, so the audited source is the executed
-source. Pin an immutable release when required:
+There are no runtime dependencies and no bundled build output. The root and
+preflight `action.yml` files run their source directly on Node 20, so the
+audited source is the executed source. Pin an immutable release when required:
 
 ```yaml
-- uses: dymoo/commitreview@v2.0.1
+- uses: dymoo/commitreview@v2.0.2
 ```
