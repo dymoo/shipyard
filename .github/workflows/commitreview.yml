@@ -19,8 +19,10 @@ concurrency:
 jobs:
   review:
     if: >-
-      github.event_name == 'pull_request_target' ||
-      (github.event.issue.pull_request && contains(github.event.comment.body, '@commitreview'))
+      vars.LLM_BASE_URL != '' &&
+      vars.LLM_MODEL != '' &&
+      (github.event_name == 'pull_request_target' ||
+       (github.event.issue.pull_request && contains(github.event.comment.body, '@commitreview')))
     runs-on: ubuntu-latest
     steps:
       - uses: dymoo/commitreview@v2
