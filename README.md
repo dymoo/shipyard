@@ -140,6 +140,25 @@ POST {base-url}/chat/completions
 Authorization: Bearer {api-key}
 ```
 
+When `base-url` is exactly `https://openrouter.ai/api/v1`, commitreview adds this
+provider policy to every model request:
+
+```json
+{
+  "provider": {
+    "data_collection": "deny",
+    "zdr": true,
+    "require_parameters": true
+  }
+}
+```
+
+This fails closed when OpenRouter cannot route the selected model to an endpoint
+that denies data collection, is marked Zero Data Retention, and supports the
+request parameters. The policy is deliberately attached by the action rather
+than delegated to consumer workflow configuration. Other base URLs are left
+unchanged; an OpenRouter-compatible proxy does not inherit this guarantee.
+
 It must support OpenAI-style function tools. Tool calling is required: an
 endpoint that rejects tools fails clearly rather than producing a diff-only
 review that looks complete.

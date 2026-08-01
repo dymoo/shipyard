@@ -17,6 +17,13 @@
  */
 import * as core from './core.js';
 
+const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+const OPENROUTER_PROVIDER_POLICY = Object.freeze({
+  data_collection: 'deny',
+  zdr: true,
+  require_parameters: true,
+});
+
 export class LLM {
   constructor(config, runtime = {}) {
     this.config = config;
@@ -45,6 +52,7 @@ export class LLM {
   buildBody(messages, { tools = null, jsonMode = undefined, schema = null, schemaName = 'response' } = {}) {
     /** @type {Record<string, unknown>} */
     const body = { model: this.config.model, messages };
+    if (this.config.baseUrl === OPENROUTER_BASE_URL) body.provider = OPENROUTER_PROVIDER_POLICY;
     if (this.quirks.temperature) body.temperature = this.config.temperature;
     if (this.quirks.maxTokensKey) body[this.quirks.maxTokensKey] = this.config.maxOutputTokens;
     // response_format and tools do not mix on several gateways; tools win.
