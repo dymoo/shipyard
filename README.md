@@ -112,7 +112,7 @@ jobs:
        !startsWith(github.event.pull_request.head.ref, 'shipyard/issue-')) ||
       (github.event_name == 'repository_dispatch' && github.event.action == 'shipyard-review') ||
       (github.event.issue.pull_request && contains(github.event.comment.body, '@shipyard'))
-    runs-on: self-hosted
+    runs-on: shipyard-runners
     steps:
       - uses: dymoo/shipyard@v3
         with:
@@ -193,10 +193,12 @@ to `.github/workflows/shipyard-coder.yml`. It deliberately has no checkout:
 Shipyard downloads the default-branch snapshot itself, and repository code runs
 only inside the sandboxed Docker copy.
 
-Shipyard's Coder and Reviewer workflows run on `self-hosted` by default. Use a
-dedicated trusted runner with Docker available; it receives model and GitHub
-credentials, and must not be shared with untrusted workloads. Keep ordinary CI
-on GitHub-hosted runners unless it independently needs your local environment.
+The maintained examples target ARC's `shipyard-runners` scale-set label. Install
+that as a dedicated, repository-scoped runner with Docker available; it receives
+model and GitHub credentials and must not be shared with untrusted workloads.
+For a non-ARC runner, replace that label with your dedicated runner label. Keep
+ordinary CI on GitHub-hosted runners unless it independently needs your local
+environment.
 
 This repository's own pilot workflow uses the official digest-pinned Node 20
 image and `npm test`, because its test command uses only Node's built-in test

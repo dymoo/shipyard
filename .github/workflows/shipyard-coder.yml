@@ -24,7 +24,7 @@ jobs:
         github.event.label.name == 'ready-for-agent' &&
         !github.event.issue.pull_request) ||
        (github.event_name == 'repository_dispatch' && github.event.action == 'shipyard-repair'))
-    runs-on: self-hosted
+    runs-on: shipyard-runners
     timeout-minutes: 45
     steps:
       - uses: dymoo/shipyard/cloud-coder@v3
