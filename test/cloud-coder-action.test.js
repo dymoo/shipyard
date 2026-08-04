@@ -31,6 +31,8 @@ test('Cloud Coder action declares the bounded implementation contract', () => {
   assert.match(action, /sandbox-image:/);
   assert.match(action, /low-complexity-model:/);
   assert.match(action, /high-complexity-model:/);
+  assert.match(action, /low-complexity-model:\n {4}description:.*\n {4}required: false/);
+  assert.match(action, /high-complexity-model:\n {4}description:.*\n {4}required: false/);
   assert.match(action, /low-complexity-reasoning-effort:/);
   assert.match(action, /high-complexity-reasoning-effort:/);
   assert.match(action, /luna-model:\n {4}description: Deprecated alias/);
