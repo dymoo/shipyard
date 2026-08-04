@@ -38,22 +38,26 @@ Shipyard does not have a separate orchestration product. The local coding tool
 remains responsible for planning, queuing, escalation and merge judgement;
 Shipyard is the factory floor inside GitHub Actions.
 
-## Start here: install the local Shipyard skill
+## Start here: bootstrap Shipyard in a repository
 
-Yes, the local skill is required. It is what turns a vague request into the
-small, testable Agent Brief that Cloud Coder can safely execute. It runs in
-your local Codex or Claude Code session; it is **not** loaded into the cloud
-agent.
+Shipyard has two local skills. `setup-shipyard` installs the factory safely in
+a repository; `shipyard` turns a vague request into the small, testable Agent
+Brief that Cloud Coder can safely execute. Both run in your local Codex or
+Claude Code session; neither is loaded into the cloud agent.
 
 1. Install Matt Pocock's real skills first: `/triage`, `/wayfinder`,
    `/to-spec`, `/to-tickets`, `/implement`, `/tdd` and `/code-review`.
-2. In Codex, ask the `skill-installer` to install:
+2. In Codex, ask the `skill-installer` to install both local skills:
 
    ```text
+   https://github.com/dymoo/shipyard/tree/main/skills/setup-shipyard
    https://github.com/dymoo/shipyard/tree/main/skills/shipyard
    ```
 
-3. Use the `shipyard` skill to define a leaf Issue, then apply
+3. In the target repository, run `setup-shipyard`. It verifies Matt's real
+   skills before modifying anything, installs the guarded Coder/Reviewer
+   workflows, and merges the local-agent contract into `AGENTS.md`.
+4. Use the `shipyard` skill to define a leaf Issue, then apply
    `ready-for-agent` only after its Agent Brief is complete.
 
 The [local-tool setup guide](docs/shipyard-llm-setup.md) has the full
@@ -75,7 +79,8 @@ implementation subsetâ€”`/implement`, TDD, debugging, code review and Ponytailâ€
 plus the approved brief. It refuses incomplete, blocked or fork-originated work
 instead of reopening product design in GitHub Actions.
 
-See [the Shipyard workflow skill](skills/shipyard/SKILL.md), the
+See [the bootstrap skill](skills/setup-shipyard/SKILL.md), [the Shipyard
+workflow skill](skills/shipyard/SKILL.md), the
 [local-tool guide](docs/shipyard-llm-setup.md) and the
 [GitHub Issues workflow](docs/agents/issue-tracker.md).
 

@@ -26,19 +26,26 @@ Use `/wayfinder` only when an initiative is genuinely uncertain or broad. Use
 `/triage` for an incoming issue or draft PR. Every executable leaf ticket gets a
 durable Agent Brief and fits a fresh implementation context.
 
-## Install the Shipyard skill
+## Bootstrap Shipyard, then install the operating skill
 
-For Codex, ask a session with the `skill-installer` skill to install:
+For Codex, ask a session with the `skill-installer` skill to install both:
 
 ```text
+https://github.com/dymoo/shipyard/tree/main/skills/setup-shipyard
 https://github.com/dymoo/shipyard/tree/main/skills/shipyard
 ```
 
+Run `setup-shipyard` inside each target repository first. It checks that the
+local tool exposes Matt's real skill names, installs guarded versioned workflows
+and a focused `AGENTS.md` contract, and leaves Coder disabled until the runner,
+pinned image, Variables and secret names are confirmed.
+
 For another local coding tool, copy
+[`skills/setup-shipyard/SKILL.md`](../skills/setup-shipyard/SKILL.md) and
 [`skills/shipyard/SKILL.md`](../skills/shipyard/SKILL.md) into that tool's normal
 project or user skill location. The tool must expose the Matt skills above under
-their real names; otherwise stop and install/configure them before using
-Shipyard.
+their real names; otherwise stop and install/configure them before using either
+Shipyard skill.
 
 ## Local-to-cloud hand-off
 

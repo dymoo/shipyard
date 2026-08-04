@@ -129,9 +129,13 @@ label with its own dedicated runner label.
   `docs/agents/triage-labels.md`. Do not create one-off process labels.
 - **Domain documentation:** This is a single-context repository; its tracked
   domain context lives in `docs/agents/domain.md`.
-- **Shipyard local skill:** `skills/shipyard/SKILL.md` is the portable local-tool
-  integration. It requires Matt Pocock's real skills and must not reproduce
-  their workflows as an ad-hoc prompt.
+- **Shipyard setup skill:** `skills/setup-shipyard/SKILL.md` is the portable
+  bootstrap. It verifies Matt Pocock's real skills before installing guarded
+  workflows and a focused repository-agent contract; it never substitutes an
+  ad-hoc prompt for a missing Matt workflow.
+- **Shipyard local skill:** `skills/shipyard/SKILL.md` is the portable operating
+  integration used after bootstrap. It requires Matt Pocock's real skills and
+  must not reproduce their workflows as an ad-hoc prompt.
 
 ## Layout
 
@@ -274,6 +278,9 @@ Keep the diff to one purpose. If it does two things, it is two pull requests.
 
 ## Changelog
 
+- 2026-08-04: Added the `setup-shipyard` local bootstrap skill. It verifies
+  Matt's real workflows before configuring guarded Shipyard Actions and the
+  target repository's agent contract.
 - 2026-08-04: Added the non-secret `SHIPYARD_CODER_READY` admission gate so a
   missing Coder secret does not allocate a privileged runner.
 - 2026-08-04: Made Cloud Coder model tiers and reasoning effort repository
