@@ -5,7 +5,8 @@ import { execFileSync } from 'node:child_process';
 
 const SECRET_NAME = /^[A-Z][A-Z0-9_]*$/;
 const RUNNER_LABEL = /^[A-Za-z0-9_.-]+$/;
-const IMAGE_DIGEST = /^[\w./:-]+@sha256:[a-f0-9]{64}$/;
+const IMAGE_DIGEST =
+  /^(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::\d+)?\/)?[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)*@sha256:[a-f0-9]{64}$/;
 const REPOSITORY = /^[\w.-]+\/[\w.-]+$/;
 const DEDICATED_RUNNER = /^shipyard-[A-Za-z0-9_.-]+$/;
 const GITHUB_HOSTED_RUNNERS = new Set([

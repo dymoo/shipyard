@@ -106,6 +106,15 @@ test('the setup validator rejects unsafe inputs before workflow edits', (t) => {
   assert.throws(() => validatePreflight({ root, ...CONFIG, runnerLabel: 'ubuntu-latest' }), /dedicated GitHub label/i);
   assert.throws(() => validatePreflight({ root, ...CONFIG, runnerLabel: 'linux' }), /dedicated GitHub label/i);
   assert.throws(() => validatePreflight({ root, ...CONFIG, sandboxImage: 'node:20' }), /SHA-256 digest/i);
+  assert.throws(
+    () =>
+      validatePreflight({
+        root,
+        ...CONFIG,
+        sandboxImage: 'ghcr.io/acme//project@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      }),
+    /SHA-256 digest/i,
+  );
   assert.throws(() => validatePreflight({ root, ...CONFIG, handoffSecret: CONFIG.modelSecret }), /different names/i);
   assert.throws(() => validatePreflight({ root, ...CONFIG, repository: 'dymoo/other' }), /local origin remote/i);
 });
