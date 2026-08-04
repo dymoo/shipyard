@@ -21,7 +21,7 @@ inputs:
     required: false
     default: ${{ github.token }}
   handoff-token:
-    description: Shared secret that authenticates Cloud Coder and Cloud Reviewer dispatches.
+    description: Shared secret used only to verify Coder dispatch proofs. Never placed in event payloads or model context.
     required: false
     default: ''
   instructions:

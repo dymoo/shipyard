@@ -15,5 +15,6 @@ or let model text choose review anchors.
 AFK-ready Agent Brief, writes an initial draft PR, runs bounded adversarial
 repair, and hands that PR to `cloud-reviewer`. It never auto-merges. The coder
 must not weaken the reviewer's non-negotiables or share its credential model.
-The two actions share a masked, opaque handoff token only to authenticate their
-repository-dispatch messages; the token never reaches either model.
+Both actions accept a repository-dispatch hand-off only with a HMAC proof bound
+to the direction, Issue, PR, repair round and exact head commit; no secret
+reaches model or event storage.

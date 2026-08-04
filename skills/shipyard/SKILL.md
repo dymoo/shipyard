@@ -74,6 +74,7 @@ Shipyard never auto-merges.
 
 Cloud Reviewer is released as `dymoo/shipyard@v3` and Cloud Coder as
 `dymoo/shipyard/cloud-coder@v3`. Before applying `ready-for-agent`, confirm the
-repository has both workflows and the same random `SHIPYARD_HANDOFF_TOKEN`
-Actions secret passed to each action. The token authenticates their fixed repair
-hand-off and is never exposed to either model.
+repository has both workflows. Shipyard accepts their fixed repair hand-off only
+with a HMAC proof bound to the direction, Issue, PR, repair round and exact
+head commit; it stores no shared secret in the dispatch payload and exposes none
+to either model.

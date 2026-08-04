@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import * as core from '../../src/core.js';
-import { matchesHandoffToken } from '../../src/handoff.js';
+import { verifiesHandoffProof } from '../../src/handoff.js';
 
 const REQUIRED_SECTIONS = [
   'Desired behaviour',
@@ -104,16 +104,30 @@ export function readIssueEvent(handoffToken = '') {
   if (eventName === 'repository_dispatch') {
     if (payload.action !== 'shipyard-repair')
       return { owner, repo, skip: 'repository dispatch is not for Shipyard repair' };
-    if (!matchesHandoffToken(payload.client_payload?.handoff_token, handoffToken)) {
-      return { owner, repo, skip: 'repair dispatch did not include the Cloud Reviewer handoff token' };
-    }
     const issueNumber = payload.client_payload?.issue;
     const pullNumber = payload.client_payload?.pull_request;
     const repairRound = payload.client_payload?.repair_round;
-    if (!Number.isInteger(issueNumber) || !Number.isInteger(pullNumber) || repairRound !== 1) {
-      return { owner, repo, skip: 'repair dispatch did not include the expected Issue, PR, and round' };
+    const headSha = payload.client_payload?.head_sha;
+    if (
+      !Number.isInteger(issueNumber) ||
+      !Number.isInteger(pullNumber) ||
+      repairRound !== 1 ||
+      typeof headSha !== 'string' ||
+      !headSha
+    ) {
+      return { owner, repo, skip: 'repair dispatch did not include the expected Issue, PR, commit, and round' };
     }
-    return { owner, repo, issueNumber, pullNumber, repairRound };
+    if (
+      !handoffToken ||
+      !verifiesHandoffProof(
+        handoffToken,
+        { direction: 'repair', issue: issueNumber, pull: pullNumber, repairRound, headSha },
+        payload.client_payload?.handoff_proof,
+      )
+    ) {
+      return { owner, repo, skip: 'repair dispatch did not include a valid Shipyard hand-off proof' };
+    }
+    return { owner, repo, issueNumber, pullNumber, repairRound, headSha };
   }
   if (eventName !== 'issues' || payload.action !== 'labeled' || payload.label?.name !== 'ready-for-agent') {
     return { owner, repo, skip: 'event is not a ready-for-agent Issue label' };

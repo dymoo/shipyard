@@ -17,6 +17,7 @@ import { collectInstructionDocs, renderConventions } from './codebase.js';
 import { investigate } from './agent.js';
 import { openRepo, openRepoViaApi } from './repo.js';
 import { commentBody, renderSummary, postInline, upsertSummary } from './post.js';
+import { createHandoffProof } from './handoff.js';
 
 async function main() {
   const config = readConfig();
@@ -30,6 +31,9 @@ async function main() {
 
   const gh = new GitHub(config.githubToken, { apiUrl: config.githubApiUrl });
   const pr = await gh.getPull(ctx.owner, ctx.repo, ctx.prNumber);
+  if (ctx.trigger === 'cloud-coder' && pr.head?.sha !== ctx.headSha) {
+    throw new Error('Cloud Coder hand-off no longer matches the pull request head.');
+  }
   if (pr.state !== 'open') core.warning(`Pull request is ${pr.state}.`);
 
   const diffText = await gh.getPullDiff(ctx.owner, ctx.repo, ctx.prNumber);
@@ -209,6 +213,7 @@ async function handoffCloudCoder(gh, ctx, pr, config, findings) {
     core.warning('Cloud Coder hand-off refused for a pull request outside the generated draft branch.');
     return;
   }
+  if (!pr.head?.sha) throw new Error('Cloud Coder hand-off requires the pull request head SHA.');
 
   if (findings && ctx.repairRound === 0) {
     await gh.request('POST', `/repos/${ctx.owner}/${ctx.repo}/dispatches`, {
@@ -218,7 +223,14 @@ async function handoffCloudCoder(gh, ctx, pr, config, findings) {
           issue: ctx.codingIssue,
           pull_request: pr.number,
           repair_round: 1,
-          handoff_token: config.handoffToken,
+          head_sha: pr.head.sha,
+          handoff_proof: createHandoffProof(config.handoffToken, {
+            direction: 'repair',
+            issue: ctx.codingIssue,
+            pull: pr.number,
+            repairRound: 1,
+            headSha: pr.head.sha,
+          }),
         },
       },
     });

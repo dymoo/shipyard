@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { readConfig, readEvent, containsPhrase, extractFocus } from '../src/config.js';
+import { createHandoffProof } from '../src/handoff.js';
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'shipyard-event-'));
 
@@ -41,6 +42,23 @@ const comment = (overrides = {}) => ({
   ...overrides,
 });
 
+function reviewDispatch(overrides = {}) {
+  const payload = { pull_request: 42, issue: 7, repair_round: 0, head_sha: 'headsha', ...overrides };
+  return {
+    action: 'shipyard-review',
+    client_payload: {
+      ...payload,
+      handoff_proof: createHandoffProof('handoff-secret', {
+        direction: 'review',
+        issue: payload.issue,
+        pull: payload.pull_request,
+        repairRound: payload.repair_round,
+        headSha: payload.head_sha,
+      }),
+    },
+  };
+}
+
 test('a collaborator mention schedules a focused review', () => {
   const ctx = withEvent('issue_comment', comment(), readEvent);
   assert.equal(ctx.prNumber, 7);
@@ -68,22 +86,15 @@ test('pull request events run and unrelated events skip', () => {
 });
 
 test('a Shipyard repository dispatch schedules the named pull request', () => {
-  const dispatch = {
-    action: 'shipyard-review',
-    client_payload: { pull_request: 42, issue: 7, repair_round: 0, handoff_token: 'trusted-handoff' },
-  };
-  const ctx = withEvent('repository_dispatch', dispatch, () => readEvent('trusted-handoff'));
+  const ctx = withEvent('repository_dispatch', reviewDispatch(), () => readEvent('handoff-secret'));
   assert.equal(ctx.prNumber, 42);
   assert.equal(ctx.trigger, 'cloud-coder');
   assert.equal(ctx.codingIssue, 7);
   assert.equal(ctx.repairRound, 0);
+  assert.equal(ctx.headSha, 'headsha');
   assert.match(
-    withEvent(
-      'repository_dispatch',
-      { action: 'shipyard-review', client_payload: { pull_request: 42, handoff_token: 'trusted-handoff' } },
-      () => readEvent('trusted-handoff'),
-    ).skip,
-    /Issue and repair round/,
+    withEvent('repository_dispatch', reviewDispatch({ issue: undefined }), () => readEvent('handoff-secret')).skip,
+    /Issue, commit, and repair round/,
   );
   assert.equal(
     withEvent('repository_dispatch', { action: 'other', client_payload: { pull_request: 42 } }, readEvent).skip,
@@ -92,27 +103,10 @@ test('a Shipyard repository dispatch schedules the named pull request', () => {
 });
 
 test('a forged Cloud Coder review dispatch cannot enter the reviewer workflow', () => {
-  const ctx = withEvent(
-    'repository_dispatch',
-    {
-      action: 'shipyard-review',
-      client_payload: { pull_request: 42, issue: 7, repair_round: 0, handoff_token: 'wrong' },
-    },
-    () => readEvent('trusted-handoff'),
-  );
-  assert.match(ctx.skip, /handoff token/i);
-});
-
-test('a forged Unicode handoff token is rejected without an action error', () => {
-  const ctx = withEvent(
-    'repository_dispatch',
-    {
-      action: 'shipyard-review',
-      client_payload: { pull_request: 42, issue: 7, repair_round: 0, handoff_token: 'a' },
-    },
-    () => readEvent('é'),
-  );
-  assert.match(ctx.skip, /handoff token/i);
+  const dispatch = reviewDispatch();
+  dispatch.client_payload.handoff_proof = 'forged';
+  const ctx = withEvent('repository_dispatch', dispatch, () => readEvent('handoff-secret'));
+  assert.match(ctx.skip, /hand-off proof/i);
 });
 
 test('trigger matching has a boundary and focus is bounded', () => {
@@ -137,8 +131,8 @@ test('configuration has seven public inputs and no URL fallback', () => {
   assert.equal(config.baseUrl, 'https://models.example/v1');
   assert.equal(config.githubApiUrl, 'https://github.example/api/v3');
   assert.equal(config.instructions, 'Use integer pence.');
-  assert.equal(config.handoffToken, 'handoff-secret');
   assert.equal(config.requestTimeoutMs, 600000);
+  assert.equal(config.handoffToken, 'handoff-secret');
   assert.ok(config.ignore.includes('private/**'));
 
   const withoutBase = { ...values };

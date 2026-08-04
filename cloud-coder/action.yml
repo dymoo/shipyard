@@ -34,7 +34,7 @@ inputs:
     required: false
     default: ${{ github.token }}
   handoff-token:
-    description: Shared secret that authenticates Cloud Coder and Cloud Reviewer dispatches.
+    description: Shared secret used only to sign Reviewer dispatch proofs. Never placed in event payloads or model context.
     required: true
   sandbox-image:
     description: Digest-pinned Docker image containing the repository's test toolchain.

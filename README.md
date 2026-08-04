@@ -101,12 +101,13 @@ jobs:
           handoff-token: ${{ secrets.SHIPYARD_HANDOFF_TOKEN }}
 ```
 
-Add `OPENAI_API_KEY` and one random `SHIPYARD_HANDOFF_TOKEN` under **Settings →
-Secrets and variables → Actions**. The handoff token must be the same value in
-the Coder and Reviewer workflows; it authenticates their two repository-dispatch
-messages and is never passed to a model. The reviewer needs an OpenAI-compatible
-Chat Completions endpoint with tool calling. It is API-key-only; a ChatGPT or
-Codex subscription is not a GitHub Actions credential.
+Add `OPENAI_API_KEY` and a random `SHIPYARD_HANDOFF_TOKEN` under **Settings →
+Secrets and variables → Actions**. The reviewer needs an OpenAI-compatible Chat
+Completions endpoint with tool calling. It is API-key-only; a ChatGPT or Codex
+subscription is not a GitHub Actions credential. Coder/Reviewer repository
+dispatches carry an HMAC proof, bound to the direction, Issue, PR, repair round
+and exact head commit. The secret is never sent in a retained event payload or
+to either model.
 
 The workflow intentionally has **no checkout**. `pull_request_target` remains
 safe only because Cloud Reviewer reads the pull-request snapshot and never
@@ -141,9 +142,9 @@ Install Shipyard Cloud Reviewer in this repository.
 5. Use the real endpoint/model available to the repository. Prefer
    gpt-5.6-luna when the OpenAI API is available; otherwise keep an existing
    compatible provider.
-6. Add `SHIPYARD_HANDOFF_TOKEN` as an Actions secret and pass it to both
-   Shipyard actions. Generate it with a cryptographically secure random source;
-   never put it in the workflow file.
+6. Create one random `SHIPYARD_HANDOFF_TOKEN` Actions secret and pass it to both
+   Shipyard actions as `handoff-token`. Do not add any secret to a
+   `repository_dispatch` payload.
 7. Run the repository's workflow validation, then show the complete diff and
    identify the secret the maintainer must add.
 ```
@@ -171,10 +172,10 @@ to `.github/workflows/shipyard-coder.yml`. It deliberately has no checkout:
 Shipyard downloads the default-branch snapshot itself, and repository code runs
 only inside the sandboxed Docker copy.
 
-Use `dymoo/shipyard/cloud-coder@v3` in the copied workflow. Add the same
-`SHIPYARD_HANDOFF_TOKEN` Actions secret used by Cloud Reviewer; this shared,
-masked token authenticates both directions of the one repair hand-off and is
-never exposed to either model.
+Use `dymoo/shipyard/cloud-coder@v3` in the copied workflow. Both actions must
+receive the same `SHIPYARD_HANDOFF_TOKEN`; Shipyard uses it only to sign and
+verify context-bound HMAC hand-offs, never stores it in the dispatch payload,
+and never exposes it to either model.
 
 Before enabling it, replace the example `sandbox-image` with an image pinned to
 an actual SHA-256 digest. That image must already contain the repository's test
@@ -205,9 +206,9 @@ routing remains controlled by the Agent Brief complexity score.
 - No completion-token cap. The provider/model owns completion length, while each
   logical model call has one ten-minute deadline shared by retries.
 
-The public inputs are `api-key`, `base-url`, `model`, `github-token`,
-`handoff-token`, `instructions` and `ignore`. See [SECURITY.md](SECURITY.md)
-and the maintained [workflow example](examples/workflows/shipyard-reviewer.yml).
+The public inputs are `api-key`, `base-url`, `model`, `github-token`, `handoff-token`,
+`instructions` and `ignore`. See [SECURITY.md](SECURITY.md) and the maintained
+[workflow example](examples/workflows/shipyard-reviewer.yml).
 
 ### OpenRouter preflight
 

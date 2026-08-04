@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import * as core from './core.js';
-import { matchesHandoffToken } from './handoff.js';
+import { verifiesHandoffProof } from './handoff.js';
 
 export const SEVERITIES = ['critical', 'high', 'medium', 'low'];
 export const VERDICT_REAL = 'real';
@@ -73,6 +73,7 @@ export function readConfig() {
 
   const githubToken = requiredInput('github-token');
   core.mask(githubToken);
+
   const handoffToken = core.getInput('handoff-token');
   if (handoffToken) core.mask(handoffToken);
 
@@ -131,6 +132,7 @@ function requiredHttpUrl(name, value) {
  * @property {string} [focus]
  * @property {number} [codingIssue]
  * @property {number} [repairRound]
+ * @property {string} [headSha]
  * @property {string} [skip]
  */
 
@@ -173,25 +175,38 @@ export function readEvent(handoffToken = '') {
   if (eventName === 'repository_dispatch') {
     if (payload.action !== 'shipyard-review')
       return { ...base, skip: 'repository dispatch is not for Shipyard review' };
-    if (!matchesHandoffToken(payload.client_payload?.handoff_token, handoffToken)) {
-      return { ...base, skip: 'repository dispatch did not include the Cloud Coder handoff token' };
-    }
     const prNumber = payload.client_payload?.pull_request;
     if (!Number.isInteger(prNumber) || prNumber < 1) {
       return { ...base, skip: 'repository dispatch did not include a pull request number' };
     }
     const codingIssue = payload.client_payload?.issue;
     const repairRound = payload.client_payload?.repair_round;
+    const headSha = payload.client_payload?.head_sha;
     if (
       !Number.isInteger(codingIssue) ||
       codingIssue < 1 ||
       !Number.isInteger(repairRound) ||
       repairRound < 0 ||
-      repairRound > 1
+      repairRound > 1 ||
+      typeof headSha !== 'string' ||
+      !headSha
     ) {
-      return { ...base, skip: 'repository dispatch did not include a valid Cloud Coder Issue and repair round' };
+      return {
+        ...base,
+        skip: 'repository dispatch did not include a valid Cloud Coder Issue, commit, and repair round',
+      };
     }
-    return { ...base, prNumber, trigger: 'cloud-coder', codingIssue, repairRound };
+    if (
+      !handoffToken ||
+      !verifiesHandoffProof(
+        handoffToken,
+        { direction: 'review', issue: codingIssue, pull: prNumber, repairRound, headSha },
+        payload.client_payload?.handoff_proof,
+      )
+    ) {
+      return { ...base, skip: 'repository dispatch did not include a valid Shipyard hand-off proof' };
+    }
+    return { ...base, prNumber, trigger: 'cloud-coder', codingIssue, repairRound, headSha };
   }
 
   if (eventName === 'pull_request' || eventName === 'pull_request_target') {

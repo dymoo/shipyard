@@ -71,6 +71,7 @@ the local session before dispatch.
 ## Current release boundary
 
 Cloud Reviewer is available as `dymoo/shipyard@v3` and Cloud Coder as
-`dymoo/shipyard/cloud-coder@v3`; see the README for the exact workflows. Both
-workflows need the same random `SHIPYARD_HANDOFF_TOKEN` Actions secret. It
-authenticates their repository-dispatch hand-offs and is not model context.
+`dymoo/shipyard/cloud-coder@v3`; see the README for the exact workflows. Their
+repository-dispatch hand-offs require a HMAC proof bound to their direction,
+Issue, PR, repair round and exact head commit. The shared secret is never
+retained in event payloads or exposed to a model.

@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { createHandoffProof } from '../src/handoff.js';
 
 const ENTRY = fileURLToPath(new URL('../cloud-coder/src/index.js', import.meta.url));
 const IMAGE = `example.test/shipyard@sha256:${'a'.repeat(64)}`;
@@ -195,7 +196,19 @@ test('the Cloud Coder entrypoint tests and publishes one draft before dispatchin
   assert.deepEqual(captured.dispatches, [
     {
       event_type: 'shipyard-review',
-      client_payload: { pull_request: 12, issue: 7, repair_round: 0, handoff_token: 'handoff-secret' },
+      client_payload: {
+        pull_request: 12,
+        issue: 7,
+        repair_round: 0,
+        head_sha: 'next-commit',
+        handoff_proof: createHandoffProof('handoff-secret', {
+          direction: 'review',
+          issue: 7,
+          pull: 12,
+          repairRound: 0,
+          headSha: 'next-commit',
+        }),
+      },
     },
   ]);
   assert.match(run.output, /dispatched/);

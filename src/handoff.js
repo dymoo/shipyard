@@ -1,9 +1,17 @@
-import { timingSafeEqual } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 
-/** Compare the opaque Coder/Reviewer dispatch token without throwing on malformed Unicode. */
-export function matchesHandoffToken(value, expected) {
-  if (typeof value !== 'string' || !expected) return false;
-  const actual = Buffer.from(value);
-  const trusted = Buffer.from(expected);
-  return actual.length === trusted.length && timingSafeEqual(actual, trusted);
+/** Bind a dispatch proof to the only state transition its receiver may make. */
+export function createHandoffProof(secret, { direction, issue, pull, repairRound, headSha }) {
+  if (typeof secret !== 'string' || !secret) throw new Error('Shipyard hand-off token is required.');
+  return createHmac('sha256', secret)
+    .update([direction, issue, pull, repairRound, headSha].join('\n'))
+    .digest('base64url');
+}
+
+/** A retained dispatch cannot be changed to authorise a different PR, commit, or round. */
+export function verifiesHandoffProof(secret, handoff, proof) {
+  if (typeof proof !== 'string' || !proof) return false;
+  const expected = Buffer.from(createHandoffProof(secret, handoff));
+  const actual = Buffer.from(proof);
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
