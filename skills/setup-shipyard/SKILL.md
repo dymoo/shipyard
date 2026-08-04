@@ -61,10 +61,15 @@ workflow file, repository Variable, model prompt, or command output.
    - Coder: `examples/workflows/shipyard-coder.yml`, using
      `dymoo/shipyard/cloud-coder@v4`.
 
-   Merge them into `.github/workflows/shipyard-reviewer.yml` and
-   `.github/workflows/shipyard-coder.yml`. If either file exists, preserve its
-   repository-specific triggers and permissions unless they weaken Shipyard's
-   trust boundary; do not overwrite it blindly.
+   Install the canonical Reviewer and Coder jobs from those examples into
+   `.github/workflows/shipyard-reviewer.yml` and
+   `.github/workflows/shipyard-coder.yml`. If either file exists, audit every
+   reachable job before changing it: replace its Shipyard job with the canonical
+   job, and reject the setup if an unsafe `pull_request_target` path cannot be
+   removed. Never retain arbitrary existing steps, actions, permissions, inputs,
+   or checkout/install/build/shell behaviour at this trust boundary. Preserve
+   only repository-specific event coverage after verifying it cannot reach an
+   unsafe job.
 
 2. Replace the example runner label and sandbox-image placeholder with the
    confirmed dedicated label and digest. Do not add checkout, install, build or
@@ -86,8 +91,8 @@ workflow file, repository Variable, model prompt, or command output.
    SHIPYARD_CODER_READY=false
    ```
 
-   Configure the model key and `SHIPYARD_HANDOFF_TOKEN` as Actions secrets.
-   Inspect only secret names when validating setup. Do not enable Coder by
+   Ensure the confirmed model-key and shared hand-off-token names are Actions
+   secrets. Inspect only secret names when validating setup. Do not enable Coder by
    setting `SHIPYARD_CODER_READY=true` until its two secret names, model
    Variables, dedicated runner, and pinned test image are all confirmed.
 

@@ -84,98 +84,37 @@ workflow skill](skills/shipyard/SKILL.md), the
 [local-tool guide](docs/shipyard-llm-setup.md) and the
 [GitHub Issues workflow](docs/agents/issue-tracker.md).
 
-## Add Shipyard Cloud Reviewer
+## Reviewer reference
 
-Create `.github/workflows/shipyard-reviewer.yml`:
+Do **not** create a reviewer-only workflow from this README. Run
+`setup-shipyard`; it installs the canonical Reviewer and Coder workflows
+together, verifies Matt's local-skill dependency, and writes the repository
+agent contract. The maintained
+[Reviewer example](examples/workflows/shipyard-reviewer.yml) is an audit
+reference, not a separate setup path.
 
-```yaml
-name: Shipyard Cloud Reviewer
+Cloud Reviewer needs an OpenAI-compatible Chat Completions endpoint with tool
+calling. It is API-key-only; a ChatGPT or Codex subscription is not a GitHub
+Actions credential. The bootstrap configures the model-key and hand-off-token
+secret names without exposing their values. Its Reviewer workflow intentionally
+has **no checkout**: `pull_request_target` is safe only because the action reads
+the pull-request snapshot and never executes its code. Do not add a head-ref
+checkout, install, build or shell step.
 
-on:
-  pull_request_target:
-    types: [opened, synchronize, reopened]
-  issue_comment:
-    types: [created]
-  repository_dispatch:
-    types: [shipyard-review]
+An owner, member or collaborator can request focused guidance with
+`@shipyard check the migration for data loss`.
 
-permissions:
-  # The fixed Coder repair hand-off needs repository_dispatch. This token is
-  # never exposed to the Cloud Reviewer model.
-  contents: write
-  issues: write
-  pull-requests: write
-
-concurrency:
-  group: shipyard-review-${{ github.event.pull_request.number || github.event.issue.number || github.event.client_payload.pull_request }}
-  cancel-in-progress: true
-
-jobs:
-  review:
-    if: >-
-      vars.LLM_BASE_URL != '' &&
-      vars.LLM_MODEL != '' &&
-      ((github.event_name == 'pull_request_target' &&
-       !startsWith(github.event.pull_request.head.ref, 'shipyard/issue-')) ||
-      (github.event_name == 'repository_dispatch' && github.event.action == 'shipyard-review') ||
-      (github.event.issue.pull_request && contains(github.event.comment.body, '@shipyard')))
-    runs-on: shipyard-runners
-    steps:
-      - uses: dymoo/shipyard@v3
-        with:
-          api-key: ${{ secrets.LLM_API_KEY }}
-          base-url: ${{ vars.LLM_BASE_URL }}
-          model: ${{ vars.LLM_MODEL }}
-          handoff-token: ${{ secrets.SHIPYARD_HANDOFF_TOKEN }}
-```
-
-Add `LLM_API_KEY` and a random `SHIPYARD_HANDOFF_TOKEN` under **Settings →
-Secrets and variables → Actions**. The reviewer needs an OpenAI-compatible Chat
-Completions endpoint with tool calling. It is API-key-only; a ChatGPT or Codex
-subscription is not a GitHub Actions credential. Coder/Reviewer repository
-dispatches carry an HMAC proof, bound to the repository, direction, Issue, PR,
-repair round and exact head commit. The secret is never sent in a retained event payload or
-to either model.
-
-The workflow intentionally has **no checkout**. `pull_request_target` remains
-safe only because Cloud Reviewer reads the pull-request snapshot and never
-executes its code. Do not add a head-ref checkout, install, build or shell step.
-The action's host code uses its GitHub token only for its fixed, non-model-led
-handoff: request one Coder repair or mark the Coder's draft PR ready for review.
-It skips ordinary pull-request events for generated `shipyard/issue-*` branches:
-the repository-dispatch run is the single review-and-handoff authority for those
-drafts.
-
-An owner, member or collaborator can request focused guidance with:
-
-```text
-@shipyard check the migration for data loss
-```
-
-## Let an LLM install it
+## Let an LLM bootstrap it
 
 Paste this into Codex, Claude Code or another trusted local coding tool:
 
 ```text
-Install Shipyard Cloud Reviewer in this repository.
-
-1. Read AGENTS.md, CONTRIBUTING.md, existing GitHub Actions workflows and PR
-   security conventions before editing.
-2. Create .github/workflows/shipyard-reviewer.yml from
-   https://github.com/dymoo/shipyard/blob/main/README.md.
-3. Reuse an existing OpenAI-compatible secret name, otherwise use
-   `LLM_API_KEY`. Set `LLM_BASE_URL` and `LLM_MODEL` as repository Variables.
-   Never put a key in a workflow file.
-4. Preserve pull_request_target without checking out, installing, building or
-   executing pull-request code in the reviewer job.
-5. Use the real endpoint/model available to the repository. Prefer
-   gpt-5.6-luna when the OpenAI API is available; otherwise keep an existing
-   compatible provider.
-6. Create one random `SHIPYARD_HANDOFF_TOKEN` Actions secret and pass it to both
-   Shipyard actions as `handoff-token`. Do not add any secret to a
-   `repository_dispatch` payload.
-7. Run the repository's workflow validation, then show the complete diff and
-   identify the secret and Variables the maintainer must add.
+Run `setup-shipyard` in this repository. First verify Matt Pocock's real skills
+are available. Then read AGENTS.md, CONTRIBUTING.md and existing GitHub Actions
+workflows before installing Shipyard's canonical Reviewer and Coder workflows.
+Do not create a reviewer-only workflow or put a secret value in a file. Show the
+complete diff, identify required secret names and Variables, and leave Coder
+disabled until its dedicated runner and digest-pinned image are confirmed.
 ```
 
 ## Models
@@ -190,17 +129,19 @@ GPT-5.6 Terra at `xhigh` for scores 4–5: the useful unit is cost per
 _accepted_ PR, not cost per raw token. DeepSeek V4 Flash remains an evaluated
 cost-sensitive alternative. These are recommendations, not defaults.
 
-## Add Shipyard Cloud Coder
+## Cloud Coder configuration reference
+
+Do **not** manually add a Coder workflow from this section. `setup-shipyard`
+installs the canonical Coder and Reviewer workflows together. This section is
+the human-readable configuration reference it uses.
 
 Cloud Coder is triggered by an **Issue**, not by a pull request. Your local
 Codex or Claude Code session must use the Shipyard/Matt Pocock workflow to make
 the Issue exceptionally clear, place the Agent Brief in its body, then add
-`ready-for-agent`.
-
-Copy [the maintained workflow example](examples/workflows/shipyard-coder.yml)
-to `.github/workflows/shipyard-coder.yml`. It deliberately has no checkout:
-Shipyard downloads the default-branch snapshot itself, and repository code runs
-only inside the sandboxed Docker copy.
+`ready-for-agent`. The canonical
+[Coder example](examples/workflows/shipyard-coder.yml) deliberately has no
+checkout: Shipyard downloads the default-branch snapshot itself, and repository
+code runs only inside the sandboxed Docker copy.
 
 The maintained examples target ARC's `shipyard-runners` scale-set label. Install
 that as a dedicated, repository-scoped runner with Docker available; it receives
