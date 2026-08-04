@@ -235,7 +235,9 @@ directly before the reviewer:
 The preflight sends no repository content. It fails closed unless the live key
 has the exact spend limit/reset interval, an exact model allowlist, a ZDR route
 and a strict synthetic tool call. The reviewer itself applies the same strict
-OpenRouter provider policy whenever that exact base URL is used.
+OpenRouter provider policy whenever that exact base URL is used. Those requests
+also carry OpenRouter's public app-attribution headers: title `Shipyard` and
+URL `https://github.com/dymoo/shipyard`.
 
 ## Security and development
 

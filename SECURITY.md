@@ -25,7 +25,10 @@ collection denied, Zero Data Retention and support for all request parameters.
 If no route satisfies that policy, review fails rather than relaxing the policy
 or falling back. The source-free preflight verifies the current key's spend
 limit/reset interval, effective model allowlist, ZDR route and strict synthetic
-tool route immediately before source-bearing review.
+tool route immediately before source-bearing review. Each OpenRouter request
+also sends fixed public attribution metadata: title `Shipyard` and URL
+`https://github.com/dymoo/shipyard`; no user, repository or request data is
+included in those headers.
 
 **Data sent to the model.** A review can send PR metadata, changed hunks and
 surrounding source, base-commit instruction documents, and non-ignored files
