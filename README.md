@@ -108,10 +108,12 @@ concurrency:
 jobs:
   review:
     if: >-
-      (github.event_name == 'pull_request_target' &&
+      vars.LLM_BASE_URL != '' &&
+      vars.LLM_MODEL != '' &&
+      ((github.event_name == 'pull_request_target' &&
        !startsWith(github.event.pull_request.head.ref, 'shipyard/issue-')) ||
       (github.event_name == 'repository_dispatch' && github.event.action == 'shipyard-review') ||
-      (github.event.issue.pull_request && contains(github.event.comment.body, '@shipyard'))
+      (github.event.issue.pull_request && contains(github.event.comment.body, '@shipyard')))
     runs-on: shipyard-runners
     steps:
       - uses: dymoo/shipyard@v3
