@@ -239,6 +239,13 @@ OpenRouter provider policy whenever that exact base URL is used. Those requests
 also carry OpenRouter's public app-attribution headers: title `Shipyard` and
 URL `https://github.com/dymoo/shipyard`.
 
+Shipyard keeps each Cloud Coder or Cloud Reviewer run on one OpenRouter sticky
+session, so providers can reuse the stable system prompt, Agent Brief, tool
+schemas and earlier transcript prefix through supported prompt caching. The
+review summary reports cache-read and cache-write tokens when the provider
+returns them. Shipyard does not enable OpenRouter response caching: agent turns
+are intentionally stateful and account-level ZDR forbids it.
+
 ## Security and development
 
 Shipyard Cloud Reviewer masks keys immediately and sends requests only to GitHub

@@ -155,7 +155,7 @@ const RESULT = {
   dropped: [],
   summaries: ['Adds a cache layer.'],
   refuted: 3,
-  usage: { requests: 4, prompt: 100, completion: 50 },
+  usage: { requests: 4, prompt: 100, completion: 50, cached: 75, cacheWrite: 25 },
   reviewedFiles: 7,
   codebase: { stats: { toolCalls: 2, conventions: 1 } },
 };
@@ -170,6 +170,8 @@ test('the sticky summary carries counts, context and demoted fingerprints', () =
   assert.ok(markdown.includes('3 refuted'));
   assert.ok(markdown.includes('2 already reported'));
   assert.ok(markdown.includes('2 codebase lookups'));
+  assert.ok(markdown.includes('75 cached input tokens'));
+  assert.ok(markdown.includes('25 cache write tokens'));
   assert.ok(markdown.includes('pnpm-lock.yaml'));
   assert.ok(markdown.includes('abcdef1'));
   assert.equal(collectFingerprints([markdown]).size, 1);

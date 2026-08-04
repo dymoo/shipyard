@@ -65,8 +65,11 @@ The review action's public inputs are exactly `api-key`, `base-url`, `model`,
 `github-token`, `handoff-token`, `instructions` and `ignore`. When its base URL
 is exactly OpenRouter, the shared client adds the fixed public app attribution
 headers `HTTP-Referer: https://github.com/dymoo/shipyard` and
-`X-OpenRouter-Title: Shipyard`. The source-free OpenRouter preflight has a
-separate exact interface: `api-key`, `required-models`, `model`, `key-limit-usd`,
+`X-OpenRouter-Title: Shipyard`, plus one `session_id` derived from the opaque
+GitHub workflow-run identifier to keep provider prompt caches sticky. It never
+enables OpenRouter response caching: turns are stateful and account-level ZDR
+forbids it. The source-free OpenRouter preflight has a separate exact interface:
+`api-key`, `required-models`, `model`, `key-limit-usd`,
 `key-limit-reset` and `diagnostic-provider`. Authentication is API-key-only.
 ChatGPT subscription OAuth is deferred in
 `docs/codex-chatgpt-auth.md`.
@@ -253,6 +256,9 @@ Keep the diff to one purpose. If it does two things, it is two pull requests.
 - 2026-08-04: Tagged exact OpenRouter requests with Shipyard's fixed public
   GitHub URL and display title for app attribution; no custom provider endpoint
   receives those headers.
+- 2026-08-04: Made exact OpenRouter Coder and Reviewer calls use one
+  run-scoped sticky prompt-cache session, and exposed provider cache-read/write
+  token counts in the review summary without enabling response caching.
 - 2026-08-04: Bound Coder/Reviewer repository-dispatch hand-offs to HMAC proofs
   over repository, direction, Issue, PR, repair round and head SHA, without storing the
   shared secret in the payload. The receiver also verifies the live PR head.

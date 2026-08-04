@@ -103,6 +103,8 @@ export function renderSummary(result, config) {
     context?.conventions ? `${context.conventions} rule doc${context.conventions === 1 ? '' : 's'}` : null,
     `${usage.requests} request${usage.requests === 1 ? '' : 's'}`,
     usage.prompt || usage.completion ? `${usage.prompt + usage.completion} tokens` : null,
+    usage.cached ? `${usage.cached} cached input token${usage.cached === 1 ? '' : 's'}` : null,
+    usage.cacheWrite ? `${usage.cacheWrite} cache write token${usage.cacheWrite === 1 ? '' : 's'}` : null,
     refuted ? `${refuted} refuted` : null,
     duplicates ? `${duplicates} already reported` : null,
     pr?.head?.sha ? `\`${pr.head.sha.slice(0, 7)}\`` : null,

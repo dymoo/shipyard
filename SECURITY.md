@@ -30,6 +30,12 @@ also sends fixed public attribution metadata: title `Shipyard` and URL
 `https://github.com/dymoo/shipyard`; no user, repository or request data is
 included in those headers.
 
+**Prompt caching.** Shipyard sends OpenRouter a run-scoped sticky `session_id`
+derived only from GitHub's opaque workflow-run identifier. It keeps provider
+prompt caching warm for one Coder or Reviewer job without retaining responses
+in OpenRouter. Shipyard never enables OpenRouter response caching: it is not a
+fit for stateful agent turns and is unavailable with account-level ZDR.
+
 **Data sent to the model.** A review can send PR metadata, changed hunks and
 surrounding source, base-commit instruction documents, and non-ignored files
 selected by the read-only investigation. Add sensitive paths explicitly to

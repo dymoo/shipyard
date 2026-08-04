@@ -303,7 +303,7 @@ function emptyResult(pr, skipped) {
     dropped: [],
     summaries: ['No reviewable changes in this pull request.'],
     refuted: 0,
-    usage: { requests: 0, prompt: 0, completion: 0 },
+    usage: { requests: 0, prompt: 0, completion: 0, cached: 0, cacheWrite: 0 },
     reviewedFiles: 0,
     codebase: null,
   };
