@@ -64,12 +64,14 @@ workflow file, repository Variable, model prompt, or command output.
    Install the canonical Reviewer and Coder jobs from those examples into
    `.github/workflows/shipyard-reviewer.yml` and
    `.github/workflows/shipyard-coder.yml`. If either file exists, audit every
-   reachable job before changing it: replace its Shipyard job with the canonical
-   job, and reject the setup if an unsafe `pull_request_target` path cannot be
-   removed. Never retain arbitrary existing steps, actions, permissions, inputs,
-   or checkout/install/build/shell behaviour at this trust boundary. Preserve
-   only repository-specific event coverage after verifying it cannot reach an
-   unsafe job.
+   reachable job before changing it. Preserve unrelated jobs, steps, actions
+   and permissions unchanged. Replace only an unambiguously identified Shipyard
+   job with the canonical job. If the canonical workflow file cannot be safely
+   partitioned from unrelated jobs or has an unsafe reachable
+   `pull_request_target` path, stop and ask the maintainer to separate the
+   workflows first; never delete unrelated automation. Never retain arbitrary
+   existing steps, actions, permissions, inputs, or
+   checkout/install/build/shell behaviour **inside the Shipyard job**.
 
 2. Replace the example runner label and sandbox-image placeholder with the
    confirmed dedicated label and digest. Do not add checkout, install, build or
@@ -92,9 +94,13 @@ workflow file, repository Variable, model prompt, or command output.
    ```
 
    Ensure the confirmed model-key and shared hand-off-token names are Actions
-   secrets. Inspect only secret names when validating setup. Do not enable Coder by
-   setting `SHIPYARD_CODER_READY=true` until its two secret names, model
-   Variables, dedicated runner, and pinned test image are all confirmed.
+   secrets. Immediately before enabling, use `gh secret list` to confirm both
+   names exist and get the maintainer's explicit confirmation that both secret
+   values are active after their latest rotation. Do not enable Coder by setting
+   `SHIPYARD_CODER_READY=true` until that verification, its model Variables,
+   dedicated runner, and pinned test image are all confirmed. Clear
+   `SHIPYARD_CODER_READY` before either secret is removed or rotated, then repeat
+   this verification before enabling it again.
 
 4. Merge this focused section into the target repository's root `AGENTS.md`.
    Preserve all existing instructions and do not create a personal-only file.
@@ -113,10 +119,11 @@ workflow file, repository Variable, model prompt, or command output.
    skills available locally.
 
    Coder requires a dedicated Docker-capable runner and a digest-pinned test
-   image. Keep `SHIPYARD_CODER_READY` false until the required Actions secrets,
-   model Variables, runner, and image are configured. Coder may create a draft
-   PR and perform one bounded repair after Cloud Reviewer findings; the local
-   session or a human decides whether to merge.
+   image. Keep `SHIPYARD_CODER_READY` false until the required Actions secrets
+   are confirmed active, model Variables, runner, and image are configured.
+   Clear it before either secret rotates. Coder may create a draft PR and
+   perform one bounded repair after Cloud Reviewer findings; the local session
+   or a human decides whether to merge.
    ```
 
 5. Update the target repository's human README with a short Shipyard setup link
@@ -129,15 +136,18 @@ workflow file, repository Variable, model prompt, or command output.
 
 1. Review the complete workflow and `AGENTS.md` diff. Run the target
    repository's normal formatting, lint, type and test checks when they exist.
-2. With `gh`, verify workflow files are present; list Variables and secret names
-   only. Confirm both Coder and Reviewer use the confirmed dedicated runner
-   label. Confirm Coder also uses a real digest and the
-   `SHIPYARD_CODER_READY == 'true'` admission condition.
+2. With `gh`, verify workflow files are present and use `gh secret list` to
+   confirm both required secret names immediately before enablement. Confirm both
+   Coder and Reviewer use the confirmed dedicated runner label. Confirm Coder
+   also uses a real digest and the `SHIPYARD_CODER_READY == 'true'` admission
+   condition.
 3. Confirm the reviewer still has no checkout, no execution of pull-request
    code, and no model-controlled write path.
-4. Only after all configuration is confirmed, set `SHIPYARD_CODER_READY=true`.
-   Leave it false when any dependency is pending. Do not manufacture a test
-   Issue or apply `ready-for-agent` merely to prove installation.
+4. Only after the maintainer has confirmed active secret values and all
+   configuration is confirmed, set `SHIPYARD_CODER_READY=true`. Leave it false
+   when any dependency is pending, and clear it before a secret rotation or
+   removal. Do not manufacture a test Issue or apply `ready-for-agent` merely
+   to prove installation.
 
 ## Hand off to normal Shipyard operation
 
