@@ -107,13 +107,24 @@ test('a Shipyard repository dispatch schedules the named pull request', () => {
 test('a forged Cloud Coder review dispatch cannot enter the reviewer workflow', () => {
   const dispatch = reviewDispatch();
   dispatch.client_payload.handoff_proof = 'forged';
-  const ctx = withEvent('repository_dispatch', dispatch, () => readEvent('handoff-secret'));
-  assert.match(ctx.skip, /hand-off proof/i);
+  assert.throws(
+    () => withEvent('repository_dispatch', dispatch, () => readEvent('handoff-secret')),
+    /requires a valid hand-off token and proof/i,
+  );
+});
+
+test('a Coder review dispatch without the configured hand-off token fails visibly', () => {
+  assert.throws(
+    () => withEvent('repository_dispatch', reviewDispatch(), readEvent),
+    /requires a valid hand-off token and proof/i,
+  );
 });
 
 test('a proof from another repository cannot enter the reviewer workflow', () => {
-  const ctx = withEvent('repository_dispatch', reviewDispatch(), () => readEvent('handoff-secret'), 'other/r');
-  assert.match(ctx.skip, /hand-off proof/i);
+  assert.throws(
+    () => withEvent('repository_dispatch', reviewDispatch(), () => readEvent('handoff-secret'), 'other/r'),
+    /requires a valid hand-off token and proof/i,
+  );
 });
 
 test('trigger matching has a boundary and focus is bounded', () => {

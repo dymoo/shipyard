@@ -90,7 +90,9 @@ findings or changes the Coder draft to ready-for-review and applies
 `ready-for-human`; it never lets the review model invoke GitHub mutations. The
 review workflow skips ordinary pull-request events for generated
 `shipyard/issue-*` branches so the repository-dispatch run is the only Coder
-review-and-handoff authority.
+review-and-handoff authority. The workflow filters repository-dispatch events to
+`shipyard-review` before a runner starts; a recognised dispatch without its
+configured HMAC token/proof fails visibly.
 
 ## Agent skills
 

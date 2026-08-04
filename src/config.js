@@ -204,7 +204,7 @@ export function readEvent(handoffToken = '') {
         payload.client_payload?.handoff_proof,
       )
     ) {
-      return { ...base, skip: 'repository dispatch did not include a valid Shipyard hand-off proof' };
+      throw new Error('Shipyard review dispatch requires a valid hand-off token and proof.');
     }
     return { ...base, prNumber, trigger: 'cloud-coder', codingIssue, repairRound, headSha };
   }

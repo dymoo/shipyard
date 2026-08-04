@@ -482,6 +482,9 @@ test('a head change during review cannot mark a newer commit ready', async (t) =
   });
   assert.notEqual(run.code, 0);
   assert.match(`${run.stdout}\n${run.stderr}`, /no longer matches the pull request head/);
+  assert.deepEqual(captured.reviews, []);
+  assert.deepEqual(captured.createdComments, []);
+  assert.deepEqual(captured.updatedComments, []);
   assert.deepEqual(captured.dispatchedEvents, []);
   assert.deepEqual(captured.updatedPulls, []);
   assert.deepEqual(captured.labels, []);
