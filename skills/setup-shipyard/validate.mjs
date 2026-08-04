@@ -211,13 +211,20 @@ function validateRunnerGroup(config) {
     `${config.repository}/.github/workflows/shipyard-coder.yml@refs/heads/${branch}`,
     `${config.repository}/.github/workflows/shipyard-reviewer.yml@refs/heads/${branch}`,
   ].sort();
-  if (JSON.stringify([...group.selected_workflows].sort()) !== JSON.stringify(expectedWorkflows)) {
+  if (
+    !Array.isArray(group.selected_workflows) ||
+    JSON.stringify([...group.selected_workflows].sort()) !== JSON.stringify(expectedWorkflows)
+  ) {
     throw new Error('Runner group must allow exactly the two Shipyard workflows on the default branch.');
   }
-  const runners = JSON.parse(
-    runGh(config, ['api', `/orgs/${owner}/actions/runner-groups/${config.runnerGroupId}/runners`]),
-  );
-  if (!runners.runners?.some((runner) => runner.labels?.some(({ name }) => name === config.runnerLabel))) {
+  const labels = runGh(config, [
+    'api',
+    '--paginate',
+    `/orgs/${owner}/actions/runner-groups/${config.runnerGroupId}/runners`,
+    '--jq',
+    '.runners[].labels[].name',
+  ]).split('\n');
+  if (!labels.includes(config.runnerLabel)) {
     throw new Error('Runner group must have a registered runner with the configured label before enablement.');
   }
 }

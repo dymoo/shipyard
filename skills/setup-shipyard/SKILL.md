@@ -77,6 +77,14 @@ repository's default branch. It must also have one registered runner using the
 configured label during setup; for ARC, set `minRunners: 1` until validation
 passes. Do not use a shared runner group.
 
+Setup is deliberately **recoverable, not transactional**: local files and
+GitHub configuration cannot be committed atomically. Before changing any
+workflow or Variable, set `SHIPYARD_CODER_READY=false`. Make all remaining
+changes, run `installed` validation, and only then let the maintainer enable
+Coder. If interrupted, leave Coder disabled, preserve the partial state for
+inspection, fix it by running this skill again, and never apply
+`ready-for-agent` to test a partial installation.
+
 ## Install the factory
 
 1. Start from Shipyard's maintained, versioned workflow examples:
@@ -103,7 +111,8 @@ passes. Do not use a shared runner group.
    workflows with those names; otherwise create secrets with exactly the example
    names. The Coder and Reviewer must reference the same hand-off secret name.
 
-3. Configure repository **Variables**, never action defaults:
+3. First set `SHIPYARD_CODER_READY=false`, then configure repository
+   **Variables**, never action defaults:
 
    ```text
    LLM_BASE_URL

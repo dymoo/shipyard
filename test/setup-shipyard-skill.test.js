@@ -37,8 +37,8 @@ const CONFIG = {
     if (args[0] === 'api' && args.includes('/orgs/dymoo/actions/runner-groups/42/repositories')) {
       return 'dymoo/example';
     }
-    if (args[0] === 'api' && args[1] === '/orgs/dymoo/actions/runner-groups/42/runners') {
-      return JSON.stringify({ runners: [{ labels: [{ name: 'self-hosted' }, { name: 'shipyard-runners' }] }] });
+    if (args[0] === 'api' && args.includes('/orgs/dymoo/actions/runner-groups/42/runners')) {
+      return 'self-hosted\nshipyard-runners';
     }
     if (args[0] === 'repo' && args[1] === 'view') return 'main';
     if (args[0] === 'variable' && args[1] === 'list') {
@@ -196,8 +196,8 @@ test('the setup validator accepts only a guarded installed factory', (t) => {
         root,
         ...CONFIG,
         execute(file, args) {
-          if (args[0] === 'api' && args[1] === '/orgs/dymoo/actions/runner-groups/42/runners') {
-            return JSON.stringify({ runners: [] });
+          if (args[0] === 'api' && args.includes('/orgs/dymoo/actions/runner-groups/42/runners')) {
+            return '';
           }
           return CONFIG.execute(file, args);
         },
