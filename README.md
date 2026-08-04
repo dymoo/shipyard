@@ -72,19 +72,22 @@ on:
     types: [opened, synchronize, reopened]
   issue_comment:
     types: [created]
+  repository_dispatch:
+    types: [shipyard-review]
 
 permissions:
   contents: read
   pull-requests: write
 
 concurrency:
-  group: shipyard-review-${{ github.event.pull_request.number || github.event.issue.number }}
+  group: shipyard-review-${{ github.event.pull_request.number || github.event.issue.number || github.event.client_payload.pull_request }}
   cancel-in-progress: true
 
 jobs:
   review:
     if: >-
       github.event_name == 'pull_request_target' ||
+      github.event_name == 'repository_dispatch' ||
       (github.event.issue.pull_request && contains(github.event.comment.body, '@shipyard'))
     runs-on: ubuntu-latest
     steps:
@@ -164,7 +167,8 @@ Before enabling it, replace the example `sandbox-image` with an image pinned to
 an actual SHA-256 digest. That image must already contain the repository's test
 toolchain because the test container has no network. The Coder reads the Brief,
 creates `shipyard/issue-<number>`, writes one non-force commit, opens a draft
-PR, and comments back on the source Issue. It never auto-merges.
+PR, dispatches Cloud Reviewer in its separate workflow, and comments back on
+the source Issue. It never auto-merges.
 
 The workflow needs `contents: write`, `issues: write` and `pull-requests:
 write` because Shipyard's host-side broker creates the branch, draft PR and

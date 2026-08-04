@@ -78,6 +78,9 @@ workflow must grant only `contents: write`, `issues: write` and
 SHA-256 digest-pinned test image with a fixed job timeout. The Coder's host-side broker creates one
 `shipyard/issue-<number>` branch, one non-force commit and one draft PR only
 after the fixed Agent Brief test command passes in a no-network container.
+It then emits the `shipyard-review` repository-dispatch event; the separate
+Cloud Reviewer workflow must listen for that event so it runs with its own
+configured model and API key.
 
 ## Agent skills
 

@@ -164,6 +164,16 @@ export function readEvent() {
     };
   }
 
+  if (eventName === 'repository_dispatch') {
+    if (payload.action !== 'shipyard-review')
+      return { ...base, skip: 'repository dispatch is not for Shipyard review' };
+    const prNumber = payload.client_payload?.pull_request;
+    if (!Number.isInteger(prNumber) || prNumber < 1) {
+      return { ...base, skip: 'repository dispatch did not include a pull request number' };
+    }
+    return { ...base, prNumber, trigger: 'cloud-coder' };
+  }
+
   if (eventName === 'pull_request' || eventName === 'pull_request_target') {
     return { ...base, prNumber: payload.pull_request?.number, trigger: eventName };
   }

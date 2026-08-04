@@ -81,6 +81,13 @@ async function main() {
       throw error;
     }
     await gh
+      .request('POST', `/repos/${ctx.owner}/${ctx.repo}/dispatches`, {
+        body: { event_type: 'shipyard-review', client_payload: { pull_request: pull.number, issue: issue.number } },
+      })
+      .catch((error) =>
+        core.warning(`Draft PR was created, but Cloud Reviewer could not be dispatched: ${error.message}`),
+      );
+    await gh
       .createIssueComment(
         ctx.owner,
         ctx.repo,
