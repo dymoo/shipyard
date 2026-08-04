@@ -74,7 +74,7 @@ export function validatePreflight(config) {
     ['Low-complexity model', config.lowComplexityModel],
     ['High-complexity model', config.highComplexityModel],
   ]) {
-    if (!value) throw new Error(`${name} is required.`);
+    if (typeof value !== 'string' || value.trim() !== value || !value) throw new Error(`${name} is required.`);
   }
   try {
     const url = new URL(config.baseUrl);
@@ -213,6 +213,12 @@ function validateRunnerGroup(config) {
   ].sort();
   if (JSON.stringify([...group.selected_workflows].sort()) !== JSON.stringify(expectedWorkflows)) {
     throw new Error('Runner group must allow exactly the two Shipyard workflows on the default branch.');
+  }
+  const runners = JSON.parse(
+    runGh(config, ['api', `/orgs/${owner}/actions/runner-groups/${config.runnerGroupId}/runners`]),
+  );
+  if (!runners.runners?.some((runner) => runner.labels?.some(({ name }) => name === config.runnerLabel))) {
+    throw new Error('Runner group must have a registered runner with the configured label before enablement.');
   }
 }
 

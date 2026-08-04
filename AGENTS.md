@@ -287,8 +287,8 @@ Keep the diff to one purpose. If it does two things, it is two pull requests.
   target repository's agent contract, with preflight, exact canonical
   installed-state validation, a live pre-enable `gh` configuration check, a
   private workflow-restricted organisation runner group, an origin-remote
-  repository check, and a requirement that omitted optional reasoning-effort
-  Variables are unset.
+  repository check, a registered runner behind the configured label, and a
+  requirement that omitted optional reasoning-effort Variables are unset.
 - 2026-08-04: Added the non-secret `SHIPYARD_CODER_READY` admission gate so a
   missing Coder secret does not allocate a privileged runner.
 - 2026-08-04: Made Cloud Coder model tiers and reasoning effort repository

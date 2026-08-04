@@ -73,7 +73,9 @@ configured. The validator then verifies their live values as well.
 This requires `gh` authentication with organisation runner-group read access.
 The installed check accepts a runner group only when it is private to exactly
 this repository and restricted to the two Shipyard workflow paths on the
-repository's default branch. Do not use a shared runner group.
+repository's default branch. It must also have one registered runner using the
+configured label during setup; for ARC, set `minRunners: 1` until validation
+passes. Do not use a shared runner group.
 
 ## Install the factory
 
@@ -172,8 +174,9 @@ repository's default branch. Do not use a shared runner group.
    no-checkout/no-shell boundary, and the target `AGENTS.md` contract. Using
    `gh`, it also proves the configured Variables are live, Coder admission is
    still `false`, the runner group is isolated to the two Shipyard workflows,
-   and the two required secret _names_ exist without reading their values. Do
-   not call setup complete unless it passes.
+   a registered runner backs the configured label, and the two required secret
+   _names_ exist without reading their values. Do not call setup complete
+   unless it passes.
 5. Only after the validator has passed and the maintainer has confirmed active
    secret values and all configuration is confirmed, set
    `SHIPYARD_CODER_READY=true`. Leave it false when any dependency is pending,

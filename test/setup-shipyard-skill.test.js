@@ -37,6 +37,9 @@ const CONFIG = {
     if (args[0] === 'api' && args.includes('/orgs/dymoo/actions/runner-groups/42/repositories')) {
       return 'dymoo/example';
     }
+    if (args[0] === 'api' && args[1] === '/orgs/dymoo/actions/runner-groups/42/runners') {
+      return JSON.stringify({ runners: [{ labels: [{ name: 'self-hosted' }, { name: 'shipyard-runners' }] }] });
+    }
     if (args[0] === 'repo' && args[1] === 'view') return 'main';
     if (args[0] === 'variable' && args[1] === 'list') {
       return JSON.stringify(
@@ -133,6 +136,7 @@ test('the setup validator rejects unsafe inputs before workflow edits', (t) => {
   );
   assert.throws(() => validatePreflight({ root, ...CONFIG, handoffSecret: CONFIG.modelSecret }), /different names/i);
   assert.throws(() => validatePreflight({ root, ...CONFIG, repository: 'dymoo/other' }), /local origin remote/i);
+  assert.throws(() => validatePreflight({ root, ...CONFIG, reviewerModel: '   ' }), /Reviewer model is required/i);
 });
 
 test('the setup validator accepts only a guarded installed factory', (t) => {
@@ -185,6 +189,20 @@ test('the setup validator accepts only a guarded installed factory', (t) => {
         },
       }),
     /Runner group must be selected-repository/i,
+  );
+  assert.throws(
+    () =>
+      validateInstalled({
+        root,
+        ...CONFIG,
+        execute(file, args) {
+          if (args[0] === 'api' && args[1] === '/orgs/dymoo/actions/runner-groups/42/runners') {
+            return JSON.stringify({ runners: [] });
+          }
+          return CONFIG.execute(file, args);
+        },
+      }),
+    /registered runner with the configured label/i,
   );
 });
 
