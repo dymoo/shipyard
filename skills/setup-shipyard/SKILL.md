@@ -52,6 +52,19 @@ never invent them:
 Do not print, write, or request secret values in an Issue, pull request,
 workflow file, repository Variable, model prompt, or command output.
 
+Before editing workflows, run the bundled validator in `preflight` mode with the
+confirmed non-secret values. It rejects a broad runner, invalid secret name,
+un-pinned image, invalid endpoint, or missing model selection before any target
+repository file changes:
+
+```text
+node /path/to/setup-shipyard/validate.mjs --mode preflight --root /path/to/repo \
+  --runner-label dedicated-runner --model-secret LLM_API_KEY \
+  --handoff-secret SHIPYARD_HANDOFF_TOKEN --sandbox-image registry/image@sha256:<64-lowercase-hex> \
+  --base-url https://provider.example/v1 --reviewer-model provider/reviewer \
+  --low-complexity-model provider/low --high-complexity-model provider/high
+```
+
 ## Install the factory
 
 1. Start from Shipyard's maintained, versioned workflow examples:
@@ -148,6 +161,11 @@ workflow file, repository Variable, model prompt, or command output.
    when any dependency is pending, and clear it before a secret rotation or
    removal. Do not manufacture a test Issue or apply `ready-for-agent` merely
    to prove installation.
+5. Run the bundled validator again in `installed` mode with the same values.
+   It checks both workflow files, exact action versions, runner labels, configured
+   secret references, Coder image/readiness, Reviewer no-checkout/no-shell
+   boundary, and the target `AGENTS.md` section. Do not call setup complete
+   unless it passes.
 
 ## Hand off to normal Shipyard operation
 

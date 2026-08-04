@@ -131,8 +131,10 @@ label with its own dedicated runner label.
   domain context lives in `docs/agents/domain.md`.
 - **Shipyard setup skill:** `skills/setup-shipyard/SKILL.md` is the portable
   bootstrap. It verifies Matt Pocock's real skills before installing guarded
-  workflows and a focused repository-agent contract; it never substitutes an
-  ad-hoc prompt for a missing Matt workflow.
+  workflows and a focused repository-agent contract. Its bundled
+  `validate.mjs` checks non-secret setup inputs before edits and the installed
+  workflows afterwards; it never substitutes an ad-hoc prompt for a missing
+  Matt workflow.
 - **Shipyard local skill:** `skills/shipyard/SKILL.md` is the portable operating
   integration used after bootstrap. It requires Matt Pocock's real skills and
   must not reproduce their workflows as an ad-hoc prompt.
@@ -280,7 +282,8 @@ Keep the diff to one purpose. If it does two things, it is two pull requests.
 
 - 2026-08-04: Added the `setup-shipyard` local bootstrap skill. It verifies
   Matt's real workflows before configuring guarded Shipyard Actions and the
-  target repository's agent contract.
+  target repository's agent contract, with preflight and installed-state
+  validation.
 - 2026-08-04: Added the non-secret `SHIPYARD_CODER_READY` admission gate so a
   missing Coder secret does not allocate a privileged runner.
 - 2026-08-04: Made Cloud Coder model tiers and reasoning effort repository
