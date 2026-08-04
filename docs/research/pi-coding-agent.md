@@ -1,7 +1,11 @@
 # Pi coding agent: small core, broad capability
 
-Research date: 2026-08-04. Sources are limited to Pi's official documentation
-and source repository.
+Research date: 2026-08-04. Compaction details were verified against Pi's
+official documentation and source snapshots: [`agent-session.ts` at `ab5f8d8`,
+committed 2026-08-04 09:05 UTC](https://github.com/earendil-works/pi/blob/ab5f8d88ee1d400c0c8fb5c50ac10b2f4a4851d1/packages/coding-agent/src/core/agent-session.ts),
+[`compaction.ts` at `9b3a205`, committed 2026-07-22 21:54 UTC](https://github.com/earendil-works/pi/blob/9b3a2059171bcc74ad9d2cadeea6d186776cf2db/packages/coding-agent/src/core/compaction/compaction.ts),
+and [the compaction documentation at `786c76c`, committed 2026-08-03 11:41
+UTC](https://github.com/earendil-works/pi/blob/786c76cb76bea452fa7287cc1014c4a3d3cad2b1/packages/coding-agent/docs/compaction.md).
 
 ## Executive finding
 
@@ -76,13 +80,34 @@ feature list. [README: introduction and philosophy](https://github.com/earendil-
   model. The SDK also supports in-memory sessions for ephemeral automation.
   [Sessions](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/sessions.md)
   [SDK: session management](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/sdk.md#session-management)
-- Compaction is a replaceable context-management policy. It summarizes older
-  turns, retains a configurable recent window, records the summary as another
-  session entry, and leaves the complete source history in JSONL. It triggers
-  proactively near the model limit or reactively after overflow; extensions can
-  provide custom compaction and branch summarisation.
-  [Compaction internals](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/compaction.md)
-  [README: compaction](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/README.md#compaction)
+- Pi's proactive trigger is `contextTokens > contextWindow - reserveTokens`.
+  Its defaults are a 16,384-token response reserve and a 20,000-token recent
+  raw-message tail. It normally cuts on turn boundaries, never at a tool result;
+  if one turn exceeds the tail budget, it separately summarises the early part
+  of that turn. Context usage prefers the provider's latest valid usage and
+  estimates only trailing messages, falling back to a characters/4 estimate.
+  [Trigger and defaults](https://github.com/earendil-works/pi/blob/9b3a2059171bcc74ad9d2cadeea6d186776cf2db/packages/coding-agent/src/core/compaction/compaction.ts#L116-L220)
+  [Cut-point implementation](https://github.com/earendil-works/pi/blob/9b3a2059171bcc74ad9d2cadeea6d186776cf2db/packages/coding-agent/src/core/compaction/compaction.ts#L287-L429)
+- The generated checkpoint has fixed sections for goal, constraints, done/in
+  progress/blocked work, decisions, next steps and critical context, with exact
+  paths, function names and errors called out for preservation. On later
+  compactions, Pi asks the model to merge the previous summary with the newly
+  compacted messages. Read and modified file lists are accumulated separately
+  in structured compaction metadata. The checkpoint plus the recent raw tail is
+  sent to the model; the complete append-only JSONL history remains available
+  for audit, resume and branching.
+  [Summary contract and iterative merge](https://github.com/earendil-works/pi/blob/9b3a2059171bcc74ad9d2cadeea6d186776cf2db/packages/coding-agent/src/core/compaction/compaction.ts#L435-L639)
+  [Preparation and cumulative state](https://github.com/earendil-works/pi/blob/9b3a2059171bcc74ad9d2cadeea6d186776cf2db/packages/coding-agent/src/core/compaction/compaction.ts#L643-L706)
+- Pi also recovers from a hard overflow or recoverable truncated response: it
+  removes the failed assistant response from active context, compacts, and
+  retries the interrupted turn exactly once. A second overflow fails visibly.
+  Stale pre-compaction usage cannot immediately retrigger compaction, and
+  summarisation calls use the normal bounded transient-error retry policy
+  (three attempts by default, with exponential backoff). A failed summary does
+  not silently replace history.
+  [Overflow and stale-usage safeguards](https://github.com/earendil-works/pi/blob/ab5f8d88ee1d400c0c8fb5c50ac10b2f4a4851d1/packages/coding-agent/src/core/agent-session.ts#L1814-L1909)
+  [Compaction execution](https://github.com/earendil-works/pi/blob/ab5f8d88ee1d400c0c8fb5c50ac10b2f4a4851d1/packages/coding-agent/src/core/agent-session.ts#L1911-L2068)
+  [Retry defaults](https://github.com/earendil-works/pi/blob/b103937d3c003a48d32de9763856f2dae55ab605/packages/coding-agent/docs/settings.md#retry)
 
 ### Sandbox and credential boundaries
 
@@ -137,16 +162,35 @@ feature list. [README: introduction and philosophy](https://github.com/earendil-
    retries, compaction, repair passes, and handoff one auditable history. Keep
    full tool inputs/results in the secured job record while sending only bounded
    recent context plus structured summaries back to the model.
-7. **Treat compaction as lossy state reconstruction.** Its summary must preserve
-   the Agent Brief, invariants, changed/read files, test outcomes, unresolved
-   failures, and remaining work. Never let compaction replace the authoritative
-   brief or diff, and validate the final workspace independently of the summary.
-8. **Keep Cloud Coder's runtime separate from Cloud Reviewer.** Current Pi main
-   requires Node `>=22.19.0`, while this repository's reviewer action has a
-   load-bearing Node 20 floor. Embed Pi in a separate action/container runtime,
-   or deliberately pin and verify a compatible Pi release; do not raise the
-   reviewer's runtime as collateral work.
-   [Pi package engine requirement](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/package.json#L646-L649)
+7. **Compact for quality, not merely overflow.** Trigger before an LLM call when
+   active input reaches the lower of the provider-safe limit
+   (`contextWindow - responseReserve`) and a model-specific quality ceiling.
+   Start with a conservative 200,000-token ceiling and Pi's 20,000-token recent
+   tail; tune the ceiling per model from accepted-PR evidence. This deliberately
+   avoids relying on nominal million-token windows after useful coding quality
+   has already degraded.
+8. **Treat the checkpoint as lossy, model-facing state.** Keep the Agent Brief,
+   base-commit project policy, current workspace/diff and test results as
+   host-owned authoritative state. The checkpoint should carry goal,
+   constraints, decisions, progress, unresolved failures, next steps and exact
+   paths/symbols/errors; track read/modified files and completed tests in typed
+   host metadata rather than trusting prose alone. Send the checkpoint plus the
+   recent raw tail, while retaining a full append-only event log outside model
+   context.
+9. **Use Pi's bounded recovery shape.** Recalculate context after compaction;
+   reject a checkpoint that does not materially reduce it; retry transient
+   summary failures within the existing request retry budget; and permit only
+   one overflow compact-and-retry for a model turn before failing visibly. The
+   first Shipyard version only needs automatic in-job compaction to solve long
+   coding/review runs. Cross-job resume can later rebuild from the same
+   checkpoint, host metadata and immutable workspace artifact without changing
+   the model-facing format.
+10. **Keep Cloud Coder's runtime separate from Cloud Reviewer.** Current Pi main
+    requires Node `>=22.19.0`, while this repository's reviewer action has a
+    load-bearing Node 20 floor. Embed Pi in a separate action/container runtime,
+    or deliberately pin and verify a compatible Pi release; do not raise the
+    reviewer's runtime as collateral work.
+    [Pi package engine requirement](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/package.json#L646-L649)
 
 The central lesson is architectural: a small core remains powerful when its
 few extension points are deep, capability-bearing, and host-controlled. For
