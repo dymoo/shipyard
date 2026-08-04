@@ -20,6 +20,8 @@
 import * as core from './core.js';
 
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+const OPENROUTER_REFERER = 'https://github.com/dymoo/shipyard';
+const OPENROUTER_TITLE = 'Shipyard';
 const OPENROUTER_PROVIDER_POLICY = Object.freeze({
   data_collection: 'deny',
   zdr: true,
@@ -103,6 +105,9 @@ export class LLM {
             authorization: `Bearer ${this.config.apiKey}`,
             'content-type': 'application/json',
             'user-agent': 'shipyard',
+            ...(this.config.baseUrl === OPENROUTER_BASE_URL
+              ? { 'HTTP-Referer': OPENROUTER_REFERER, 'X-OpenRouter-Title': OPENROUTER_TITLE }
+              : {}),
           },
           body: JSON.stringify(body),
           signal: this.runtime.timeoutSignal(remainingMs),

@@ -101,6 +101,26 @@ test('OpenRouter requests deny provider data collection and require ZDR', () => 
   assert.deepEqual(llm.buildBody([], { tools }).provider, expectedPolicy);
 });
 
+test('OpenRouter requests identify Shipyard without attributing other compatible endpoints', async () => {
+  const headers = [];
+  const runtime = {
+    fetch: async (_url, init) => {
+      headers.push(init.headers);
+      return Response.json({ choices: [{ message: { content: 'ok' } }] });
+    },
+  };
+
+  await new LLM(base, runtime).send([{ role: 'user', content: 'review this' }]);
+  await new LLM({ ...base, baseUrl: 'https://openrouter.ai/api/v1' }, runtime).send([
+    { role: 'user', content: 'review this' },
+  ]);
+
+  assert.equal(headers[0]['HTTP-Referer'], undefined);
+  assert.equal(headers[0]['X-OpenRouter-Title'], undefined);
+  assert.equal(headers[1]['HTTP-Referer'], 'https://github.com/dymoo/shipyard');
+  assert.equal(headers[1]['X-OpenRouter-Title'], 'Shipyard');
+});
+
 test('OpenRouter parameter adaptation never strips the provider privacy policy', async () => {
   const requests = [];
   const llm = new LLM(
