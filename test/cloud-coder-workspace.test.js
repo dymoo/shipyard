@@ -33,3 +33,15 @@ test('rejects path escapes, git metadata, and symlink writes', async (t) => {
   await assert.rejects(() => workspace.write('.git/config', 'no'), /git metadata/i);
   await assert.rejects(() => workspace.write('linked/outside.txt', 'no'), /symlink/i);
 });
+
+test('reads and lists ordinary workspace files without following links', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'shipyard-coder-workspace-'));
+  fs.mkdirSync(path.join(root, 'src'));
+  fs.writeFileSync(path.join(root, 'src/app.js'), 'export const app = true;');
+  fs.symlinkSync(path.join(root, 'src/app.js'), path.join(root, 'src/link.js'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const workspace = new Workspace(root);
+
+  assert.equal(await workspace.read('src/app.js'), 'export const app = true;');
+  assert.deepEqual(await workspace.list(), ['src/app.js']);
+});

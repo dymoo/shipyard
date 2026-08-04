@@ -144,6 +144,33 @@ Flash remains an evaluated cost-sensitive alternative.
 setting for Cloud Coder's future harness, not an input on this six-input,
 provider-agnostic reviewer.
 
+## Add Shipyard Cloud Coder
+
+Cloud Coder is triggered by an **Issue**, not by a pull request. Your local
+Codex or Claude Code session must use the Shipyard/Matt Pocock workflow to make
+the Issue exceptionally clear, place the Agent Brief in its body, then add
+`ready-for-agent`.
+
+Copy [the maintained workflow example](examples/workflows/shipyard-coder.yml)
+to `.github/workflows/shipyard-coder.yml`. It deliberately has no checkout:
+Shipyard downloads the default-branch snapshot itself, and repository code runs
+only inside the sandboxed Docker copy.
+
+Cloud Coder is still a development preview in this branch. Do not enable the
+template until the first Coder release is tagged; replace `<released-version>`
+with that immutable release reference when it is published.
+
+Before enabling it, replace the example `sandbox-image` with an image pinned to
+an actual SHA-256 digest. That image must already contain the repository's test
+toolchain because the test container has no network. The Coder reads the Brief,
+creates `shipyard/issue-<number>`, writes one non-force commit, opens a draft
+PR, and comments back on the source Issue. It never auto-merges.
+
+The workflow needs `contents: write`, `issues: write` and `pull-requests:
+write` because Shipyard's host-side broker creates the branch, draft PR and
+run comment. Its 45-minute job limit is deliberate: the model does not receive
+that token or a shell, but an agentic run must still have an unambiguous end.
+
 ## What Cloud Reviewer guarantees
 
 - One investigator, one review pass and a skeptic for each candidate.

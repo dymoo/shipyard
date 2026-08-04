@@ -29,6 +29,17 @@ export class Workspace {
     this.#changes.set(relativePath, null);
   }
 
+  async read(relativePath) {
+    const target = await this.#safeTarget(relativePath, { createParents: false });
+    const stat = await fsp.lstat(target).catch(() => null);
+    if (!stat?.isFile()) return null;
+    return fsp.readFile(target, 'utf8');
+  }
+
+  async list() {
+    return walk(this.root, this.root);
+  }
+
   changes() {
     return [...this.#changes]
       .map(([path, content]) => ({ path, content }))
@@ -58,4 +69,15 @@ export class Workspace {
     if (stat?.isSymbolicLink()) throw new Error(`Cloud Coder refuses a symlink target: ${relativePath}`);
     return target;
   }
+}
+
+async function walk(root, directory, paths = []) {
+  const entries = await fsp.readdir(directory, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.name === '.git' || entry.isSymbolicLink()) continue;
+    const full = path.join(directory, entry.name);
+    if (entry.isDirectory()) await walk(root, full, paths);
+    else if (entry.isFile()) paths.push(path.relative(root, full).split(path.sep).join('/'));
+  }
+  return paths.sort();
 }

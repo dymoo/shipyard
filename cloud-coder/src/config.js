@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import * as core from '../../src/core.js';
+
 const REQUIRED_SECTIONS = [
   'Desired behaviour',
   'Non-goals',
@@ -48,4 +51,70 @@ export function assertAdmissibleIssue(issue) {
   if (!issue.labels?.some((label) => label.name === 'ready-for-agent')) {
     throw new Error('Cloud Coder requires the ready-for-agent label.');
   }
+}
+
+const LIMITS = Object.freeze({ requestTimeoutMs: 600000, temperature: 0.1 });
+
+/** Read the separate Cloud Coder Action contract. */
+export function readConfig() {
+  const apiKey = requiredInput('api-key');
+  const githubToken = requiredInput('github-token');
+  core.mask(apiKey);
+  core.mask(githubToken);
+  return {
+    apiKey,
+    githubToken,
+    baseUrl: requiredUrl('base-url', requiredInput('base-url')),
+    model: requiredInput('model'),
+    sandboxImage: requiredInput('sandbox-image'),
+    githubApiUrl: requiredUrl('GITHUB_API_URL', requiredEnv('GITHUB_API_URL')),
+    ...LIMITS,
+  };
+}
+
+/** Resolve only a ready-for-agent Issue label event. */
+export function readIssueEvent() {
+  const [owner, repo] = requiredEnv('GITHUB_REPOSITORY').split('/');
+  if (!owner || !repo) throw new Error('GITHUB_REPOSITORY must be in owner/repository form.');
+  const eventName = requiredEnv('GITHUB_EVENT_NAME');
+  const eventPath = requiredEnv('GITHUB_EVENT_PATH');
+  if (!fs.existsSync(eventPath)) throw new Error(`GITHUB_EVENT_PATH does not exist: ${eventPath}`);
+  const payload = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
+  if (eventName !== 'issues' || payload.action !== 'labeled' || payload.label?.name !== 'ready-for-agent') {
+    return { owner, repo, skip: 'event is not a ready-for-agent Issue label' };
+  }
+  if (!Number.isInteger(payload.issue?.number)) return { owner, repo, skip: 'event did not include an Issue number' };
+  return { owner, repo, issueNumber: payload.issue.number };
+}
+
+function requiredInput(name) {
+  const value = core.getInput(name);
+  if (value) return value;
+  throw new Error(`Input "${name}" is required and resolved to an empty value.`);
+}
+
+function requiredEnv(name) {
+  const value = process.env[name]?.trim();
+  if (value) return value;
+  throw new Error(`${name} is required.`);
+}
+
+function requiredUrl(name, value) {
+  const cleaned = value.replace(/\/+$/, '');
+  let parsed;
+  try {
+    parsed = new URL(cleaned);
+  } catch (error) {
+    throw new Error(`${name} must be an absolute HTTP(S) URL.`, { cause: error });
+  }
+  if (
+    !['http:', 'https:'].includes(parsed.protocol) ||
+    parsed.username ||
+    parsed.password ||
+    parsed.search ||
+    parsed.hash
+  ) {
+    throw new Error(`${name} must be an absolute HTTP(S) URL without credentials, query, or fragment.`);
+  }
+  return cleaned;
 }

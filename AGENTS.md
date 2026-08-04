@@ -68,6 +68,15 @@ preflight has a separate exact interface: `api-key`, `required-models`, `model`,
 API-key-only. ChatGPT subscription OAuth is deferred in
 `docs/codex-chatgpt-auth.md`.
 
+Cloud Coder's separate public inputs are `api-key`, `base-url`, `model`,
+`github-token` and `sandbox-image`. It triggers only from an `issues` label
+event for `ready-for-agent`; it accepts an open Issue rather than a PR. The
+workflow must grant only `contents: write`, `issues: write` and
+`pull-requests: write`, must not check out repository code, and must pass a
+SHA-256 digest-pinned test image with a fixed job timeout. The Coder's host-side broker creates one
+`shipyard/issue-<number>` branch, one non-force commit and one draft PR only
+after the fixed Agent Brief test command passes in a no-network container.
+
 ## Agent skills
 
 - **Issue tracker:** GitHub Issues in `dymoo/shipyard`. See
@@ -220,6 +229,9 @@ Keep the diff to one purpose. If it does two things, it is two pull requests.
 
 ## Changelog
 
+- 2026-08-04: Added the Cloud Coder Issue-to-draft-PR vertical slice: a
+  label-gated Issue Action, bounded coding tools, archive workspace, final
+  no-network test, non-force Git Data commit and draft PR broker.
 - 2026-08-04: Added the isolated Cloud Coder v1 security prototype: strict
   Issue Brief admission, lazy immutable implementation skills, contained
   workspace edits and a credential-free no-network Docker test boundary.

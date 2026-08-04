@@ -1,0 +1,36 @@
+name: Shipyard Cloud Coder
+description: Turn one well-defined Shipyard Issue into a tested draft pull request.
+author: Shipyard contributors
+
+branding:
+  icon: git-pull-request
+  color: purple
+
+inputs:
+  api-key:
+    description: API key for the OpenAI-compatible coding endpoint. Pass a secret, never a literal.
+    required: true
+  base-url:
+    description: Base URL of the OpenAI-compatible API, including its version path.
+    required: true
+  model:
+    description: Model id as the provider names it.
+    required: false
+    default: gpt-5.6-luna
+  github-token:
+    description: Token used only by Shipyard's host-side GitHub broker.
+    required: false
+    default: ${{ github.token }}
+  sandbox-image:
+    description: Digest-pinned Docker image containing the repository's test toolchain.
+    required: true
+
+outputs:
+  dispatched:
+    description: 'true when an Issue became a draft pull request; false when it was ignored.'
+  pull-request:
+    description: The generated draft pull request number, when dispatched.
+
+runs:
+  using: node20
+  main: src/index.js

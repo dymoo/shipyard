@@ -1,0 +1,30 @@
+name: Shipyard Cloud Coder
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: shipyard-coder-issue-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  code:
+    if: >-
+      github.event.action == 'labeled' &&
+      github.event.label.name == 'ready-for-agent' &&
+      !github.event.issue.pull_request
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: dymoo/shipyard/cloud-coder@<released-version>
+        with:
+          api-key: ${{ secrets.OPENAI_API_KEY }}
+          base-url: https://api.openai.com/v1
+          model: gpt-5.6-luna
+          sandbox-image: ghcr.io/acme/project-ci@sha256:replace-with-a-real-image-digest
