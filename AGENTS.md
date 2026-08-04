@@ -241,6 +241,11 @@ Keep the diff to one purpose. If it does two things, it is two pull requests.
 
 ## Changelog
 
+- 2026-08-04: Hardened Cloud Coder publication and hand-off: verify the base
+  ref immediately before creating its branch, preserve regular-file mode, fail
+  reviewer-dispatch errors visibly, mask Coder keys immediately, and exercise
+  the entrypoint sequence end to end. The synthetic OpenRouter preflight also
+  omits optional temperature so Luna's strict tool route remains eligible.
 - 2026-08-04: Made the OpenRouter client recognise its parameter-routing 404
   response and retry without only the optional temperature field; tool calling,
   ZDR and required-parameter routing remain fixed.

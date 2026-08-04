@@ -75,6 +75,7 @@ async function main() {
       owner: ctx.owner,
       repo: ctx.repo,
       baseSha: dispatch.sha,
+      baseBranch: dispatch.base,
       branch: dispatch.branch,
       changes,
       message: `Shipyard: implement #${issue.number}`,
@@ -148,11 +149,9 @@ async function reviewerFeedback(gh, ctx, pullNumber) {
 }
 
 function dispatchReview(gh, ctx, { pull, issue, repairRound }) {
-  return gh
-    .request('POST', `/repos/${ctx.owner}/${ctx.repo}/dispatches`, {
-      body: { event_type: 'shipyard-review', client_payload: { pull_request: pull, issue, repair_round: repairRound } },
-    })
-    .catch((error) => core.warning(`Cloud Reviewer could not be dispatched: ${error.message}`));
+  return gh.request('POST', `/repos/${ctx.owner}/${ctx.repo}/dispatches`, {
+    body: { event_type: 'shipyard-review', client_payload: { pull_request: pull, issue, repair_round: repairRound } },
+  });
 }
 
 async function assertNoActivePull(gh, { owner, repo }, branch) {

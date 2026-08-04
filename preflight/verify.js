@@ -142,7 +142,6 @@ function requestBody(model, providerOverrides = {}) {
   return {
     model,
     messages: SYNTHETIC_MESSAGES,
-    temperature: 0.1,
     tools: [TOOL],
     tool_choice: { type: 'function', function: { name: 'read_file' } },
     usage: { include: true },

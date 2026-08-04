@@ -58,8 +58,8 @@ const LIMITS = Object.freeze({ requestTimeoutMs: 600000, temperature: 0.1 });
 /** Read the separate Cloud Coder Action contract. */
 export function readConfig() {
   const apiKey = requiredInput('api-key');
-  const githubToken = requiredInput('github-token');
   core.mask(apiKey);
+  const githubToken = requiredInput('github-token');
   core.mask(githubToken);
   return {
     apiKey,

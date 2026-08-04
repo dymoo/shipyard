@@ -7,7 +7,18 @@ test('publishes one non-force commit from a checked workspace change set', async
   const gh = {
     async request(method, path, options = {}) {
       calls.push({ method, path, body: options.body });
+      if (path === '/repos/o/r/git/ref/heads/main') return { data: { object: { sha: 'base-sha' } } };
       if (path === '/repos/o/r/git/commits/base-sha') return { data: { tree: { sha: 'base-tree' } } };
+      if (path === '/repos/o/r/git/trees/base-tree?recursive=1') {
+        return {
+          data: {
+            tree: [
+              { path: 'src/new.js', mode: '100755' },
+              { path: 'src/old.js', mode: '100644' },
+            ],
+          },
+        };
+      }
       if (path === '/repos/o/r/git/blobs') return { data: { sha: `blob-${calls.length}` } };
       if (path === '/repos/o/r/git/trees') return { data: { sha: 'next-tree' } };
       if (path === '/repos/o/r/git/commits') return { data: { sha: 'next-commit' } };
@@ -23,6 +34,7 @@ test('publishes one non-force commit from a checked workspace change set', async
     owner: 'o',
     repo: 'r',
     baseSha: 'base-sha',
+    baseBranch: 'main',
     branch,
     changes: [
       { path: 'src/new.js', content: 'export const value = 1;\n' },
@@ -57,6 +69,11 @@ test('publishes one non-force commit from a checked workspace change set', async
     path: '/repos/o/r/git/refs/heads/shipyard%2Fissue-7',
     body: { sha: 'next-commit', force: false },
   });
+  const tree = calls.find((call) => call.method === 'POST' && call.path === '/repos/o/r/git/trees');
+  assert.deepEqual(tree.body.tree, [
+    { path: 'src/new.js', mode: '100755', type: 'blob', sha: 'blob-5' },
+    { path: 'src/old.js', mode: '100644', type: 'blob', sha: null },
+  ]);
 });
 
 test('refuses invalid branch names and unsafe change paths before writing', async () => {
@@ -69,6 +86,7 @@ test('refuses invalid branch names and unsafe change paths before writing', asyn
           owner: 'o',
           repo: 'r',
           baseSha: 'base',
+          baseBranch: 'main',
           branch: 'shipyard/issue-1',
           changes: [{ path: '../x', content: 'x' }],
           message: 'Shipyard: implement #1',
@@ -83,8 +101,10 @@ test('removes a newly-created branch when Git Data publishing fails', async () =
   const gh = {
     async request(method, path) {
       calls.push({ method, path });
+      if (method === 'GET' && path.endsWith('/git/ref/heads/main')) return { data: { object: { sha: 'base' } } };
       if (method === 'POST' && path.endsWith('/git/refs')) return { data: {} };
       if (method === 'GET' && path.endsWith('/git/commits/base')) return { data: { tree: { sha: 'tree' } } };
+      if (method === 'GET' && path.endsWith('/git/trees/tree?recursive=1')) return { data: { tree: [] } };
       if (method === 'POST' && path.endsWith('/git/blobs')) throw new Error('GitHub unavailable');
       if (method === 'DELETE' && path.endsWith('/git/refs/heads/shipyard%2Fissue-8')) return { data: {} };
       throw new Error(`Unexpected ${method} ${path}`);
@@ -97,6 +117,7 @@ test('removes a newly-created branch when Git Data publishing fails', async () =
         owner: 'o',
         repo: 'r',
         baseSha: 'base',
+        baseBranch: 'main',
         branch: 'shipyard/issue-8',
         changes: [{ path: 'app.js', content: 'export {};' }],
         message: 'Shipyard: implement #8',
@@ -113,6 +134,7 @@ test('adds a repair only when the draft branch is still at the reviewed commit',
       calls.push({ method, path, body: options.body });
       if (path === '/repos/o/r/git/ref/heads/shipyard%2Fissue-7') return { data: { object: { sha: 'reviewed-sha' } } };
       if (path === '/repos/o/r/git/commits/reviewed-sha') return { data: { tree: { sha: 'reviewed-tree' } } };
+      if (path === '/repos/o/r/git/trees/reviewed-tree?recursive=1') return { data: { tree: [] } };
       if (path === '/repos/o/r/git/blobs') return { data: { sha: 'repair-blob' } };
       if (path === '/repos/o/r/git/trees') return { data: { sha: 'repair-tree' } };
       if (path === '/repos/o/r/git/commits') return { data: { sha: 'repair-commit' } };
@@ -147,4 +169,30 @@ test('adds a repair only when the draft branch is still at the reviewed commit',
       }),
     /branch moved/i,
   );
+});
+
+test('refuses initial publication when the default branch moved during the coding run', async () => {
+  const calls = [];
+  const gh = {
+    async request(method, path) {
+      calls.push({ method, path });
+      if (path === '/repos/o/r/git/ref/heads/main') return { data: { object: { sha: 'new-main-sha' } } };
+      throw new Error(`Unexpected ${method} ${path}`);
+    },
+  };
+
+  await assert.rejects(
+    () =>
+      publishChanges(gh, {
+        owner: 'o',
+        repo: 'r',
+        baseSha: 'old-main-sha',
+        baseBranch: 'main',
+        branch: 'shipyard/issue-7',
+        changes: [{ path: 'src/app.js', content: 'export {};' }],
+        message: 'Shipyard: implement #7',
+      }),
+    /base branch moved/i,
+  );
+  assert.equal(calls.length, 1);
 });
