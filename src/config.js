@@ -63,7 +63,6 @@ const LIMITS = {
   concurrency: 4,
   maxFindings: 25,
   minSeverity: 'low',
-  temperature: 0.1,
   requestTimeoutMs: 600000,
 };
 

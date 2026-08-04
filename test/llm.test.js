@@ -6,7 +6,6 @@ const base = {
   model: 'test-model',
   baseUrl: 'https://example.invalid/v1',
   apiKey: 'k',
-  temperature: 0.1,
   requestTimeoutMs: 1000,
 };
 
@@ -73,7 +72,7 @@ test('request body leaves completion length to the provider and model', () => {
   const llm = new LLM(base);
   const body = llm.buildBody([{ role: 'user', content: 'hi' }]);
   assert.equal(body.model, 'test-model');
-  assert.equal(body.temperature, 0.1);
+  assert.equal(body.temperature, undefined);
   assert.equal(body.max_tokens, undefined);
   assert.equal(body.max_completion_tokens, undefined);
   assert.deepEqual(body.response_format, { type: 'json_object' });
@@ -169,37 +168,6 @@ test('OpenRouter parameter adaptation never strips the provider privacy policy',
       zdr: true,
       require_parameters: true,
     });
-  }
-});
-
-test('OpenRouter retries a parameter-routing 404 without optional temperature', async () => {
-  const requests = [];
-  const llm = new LLM(
-    { ...base, baseUrl: 'https://openrouter.ai/api/v1' },
-    {
-      fetch: async (_url, init) => {
-        requests.push(JSON.parse(String(init.body)));
-        if (requests.length === 1) {
-          return new Response('No endpoints found that can handle the requested parameters.', { status: 404 });
-        }
-        return Response.json({ choices: [{ message: { content: 'ok' } }] });
-      },
-    },
-  );
-  const tools = [{ type: 'function', function: { name: 'read_file', parameters: { type: 'object' } } }];
-
-  await llm.send([{ role: 'user', content: 'review this' }], { tools });
-
-  assert.equal(requests.length, 2);
-  assert.equal(requests[0].temperature, 0.1);
-  assert.equal(requests[1].temperature, undefined);
-  for (const request of requests) {
-    assert.deepEqual(request.provider, {
-      data_collection: 'deny',
-      zdr: true,
-      require_parameters: true,
-    });
-    assert.deepEqual(request.tools, tools);
   }
 });
 
@@ -352,13 +320,6 @@ test('an endpoint that rejects tool calling is a hard error, not a degrade', asy
   }
 });
 
-test('drops temperature when the model only supports the default', () => {
-  const llm = new LLM(base);
-  llm.quirks.jsonMode = false;
-  assert.equal(llm.adapt("'temperature' does not support 0.1 with this model"), true);
-  assert.equal(llm.buildBody([]).temperature, undefined);
-});
-
 test('a concurrent adaptation is retried rather than adapted twice', () => {
   // Several requests are in flight on one client. If two hit the same
   // rejection, the second must not strip an unrelated parameter as collateral.
@@ -367,12 +328,11 @@ test('a concurrent adaptation is retried rather than adapted twice', () => {
   llm.adapt('Unsupported parameter: response_format');
   assert.notEqual(llm.quirksVersion, before, 'a real adaptation bumps the version');
   assert.equal(llm.quirks.jsonMode, false);
-  assert.equal(llm.quirks.temperature, true, 'an unrelated quirk is untouched');
+  assert.equal(llm.quirks.reasoningEffort, false, 'an unrelated quirk is untouched');
 });
 
 test('adaptation eventually gives up instead of looping', () => {
   const llm = new LLM(base);
   llm.quirks.jsonMode = false;
-  llm.quirks.temperature = false;
   assert.equal(llm.adapt('some unrelated failure'), false);
 });

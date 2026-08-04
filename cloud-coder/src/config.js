@@ -54,7 +54,7 @@ export function assertAdmissibleIssue(issue) {
   }
 }
 
-const LIMITS = Object.freeze({ requestTimeoutMs: 600000, temperature: 0.1 });
+const LIMITS = Object.freeze({ requestTimeoutMs: 600000 });
 
 /** Read the separate Cloud Coder Action contract. */
 export function readConfig() {

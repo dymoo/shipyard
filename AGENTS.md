@@ -253,6 +253,9 @@ Keep the diff to one purpose. If it does two things, it is two pull requests.
 
 ## Changelog
 
+- 2026-08-04: Removed the obsolete `temperature` request parameter and its
+  fallback retry from both Coder and Reviewer model calls; reasoning models now
+  use their provider defaults without an avoidable failed request.
 - 2026-08-04: Tagged exact OpenRouter requests with Shipyard's fixed public
   GitHub URL and display title for app attribution; no custom provider endpoint
   receives those headers.
