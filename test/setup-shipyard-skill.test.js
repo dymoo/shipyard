@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { validateInstalled, validatePreflight } from '../skills/setup-shipyard/validate.mjs';
 
 const CONFIG = {
+  repository: 'dymoo/example',
   runnerLabel: 'shipyard-runners',
   modelSecret: 'LLM_API_KEY',
   handoffSecret: 'SHIPYARD_HANDOFF_TOKEN',
@@ -15,6 +16,21 @@ const CONFIG = {
   reviewerModel: 'provider/reviewer',
   lowComplexityModel: 'provider/low',
   highComplexityModel: 'provider/high',
+  execute(_file, args) {
+    if (args[0] === 'variable' && args[1] === 'get') {
+      return {
+        LLM_BASE_URL: 'https://provider.example/v1',
+        LLM_MODEL: 'provider/reviewer',
+        SHIPYARD_CODER_LOW_COMPLEXITY_MODEL: 'provider/low',
+        SHIPYARD_CODER_HIGH_COMPLEXITY_MODEL: 'provider/high',
+        SHIPYARD_CODER_READY: 'false',
+      }[args[2]];
+    }
+    if (args[0] === 'secret' && args[1] === 'list') {
+      return JSON.stringify([{ name: 'LLM_API_KEY' }, { name: 'SHIPYARD_HANDOFF_TOKEN' }]);
+    }
+    throw new Error(`Unexpected gh command: ${args.join(' ')}`);
+  },
 };
 
 function configuredWorkflow(name) {
@@ -94,9 +110,22 @@ test('the setup validator accepts only a guarded installed factory', (t) => {
 
   writeInstalledFactory(root);
   const agentsPath = path.join(root, 'AGENTS.md');
-  const quotedContract = fs.readFileSync(agentsPath, 'utf8').replace('## Shipyard', '## Unrelated');
-  fs.writeFileSync(agentsPath, `${quotedContract}\n## Shipyard\n`);
+  fs.appendFileSync(agentsPath, `\n${fs.readFileSync(agentsPath, 'utf8')}`);
   assert.throws(() => validateInstalled({ root, ...CONFIG }), /complete Shipyard contract/i);
+
+  writeInstalledFactory(root);
+  assert.throws(
+    () =>
+      validateInstalled({
+        root,
+        ...CONFIG,
+        execute(file, args) {
+          if (args[2] === 'SHIPYARD_CODER_READY') return 'true';
+          return CONFIG.execute(file, args);
+        },
+      }),
+    /SHIPYARD_CODER_READY must match/i,
+  );
 });
 
 test('the bundled templates stay identical to their published workflow examples', () => {
@@ -126,6 +155,8 @@ test('the setup validator refuses unknown command options', (t) => {
     'preflight',
     '--root',
     root,
+    '--repository',
+    CONFIG.repository,
     '--runner-label',
     CONFIG.runnerLabel,
     '--model-secret',

@@ -1,10 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
 
 const SECRET_NAME = /^[A-Z][A-Z0-9_]*$/;
 const RUNNER_LABEL = /^[A-Za-z0-9_.-]+$/;
 const IMAGE_DIGEST = /^[\w./:-]+@sha256:[a-f0-9]{64}$/;
+const REPOSITORY = /^[\w.-]+\/[\w.-]+$/;
 const GITHUB_HOSTED_RUNNERS = new Set([
   'ubuntu-latest',
   'ubuntu-24.04',
@@ -24,6 +26,7 @@ const SKILL_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const OPTIONS = new Set([
   '--mode',
   '--root',
+  '--repository',
   '--runner-label',
   '--model-secret',
   '--handoff-secret',
@@ -36,6 +39,7 @@ const OPTIONS = new Set([
 
 export function validatePreflight(config) {
   requiredDirectory(config.root, 'Repository root');
+  if (!REPOSITORY.test(config.repository)) throw new Error('Repository must be in owner/repository form.');
   if (
     !RUNNER_LABEL.test(config.runnerLabel) ||
     config.runnerLabel === 'self-hosted' ||
@@ -78,6 +82,7 @@ export function validateInstalled(config) {
   validateWorkflow(config, 'shipyard-reviewer.yml');
   validateWorkflow(config, 'shipyard-coder.yml');
   validateAgents(config.root);
+  validateLiveConfiguration(config);
 }
 
 function validateWorkflow(config, name) {
@@ -121,12 +126,43 @@ function validateAgents(root) {
 }
 
 function markdownSection(document, name) {
-  const heading = new RegExp(`^## ${name}$`, 'm').exec(document);
-  if (!heading || heading.index === undefined) return null;
+  const headings = [...document.matchAll(new RegExp(`^## ${name}$`, 'gm'))];
+  if (headings.length !== 1 || headings[0].index === undefined) return null;
+  const heading = headings[0];
   const followingHeading = /^## /gm;
   followingHeading.lastIndex = heading.index + heading[0].length;
   const next = followingHeading.exec(document);
   return document.slice(heading.index, next?.index);
+}
+
+function validateLiveConfiguration(config) {
+  const expectedVariables = {
+    LLM_BASE_URL: config.baseUrl,
+    LLM_MODEL: config.reviewerModel,
+    SHIPYARD_CODER_LOW_COMPLEXITY_MODEL: config.lowComplexityModel,
+    SHIPYARD_CODER_HIGH_COMPLEXITY_MODEL: config.highComplexityModel,
+    SHIPYARD_CODER_READY: 'false',
+  };
+  for (const [name, expected] of Object.entries(expectedVariables)) {
+    if (runGh(config, ['variable', 'get', name, '--repo', config.repository]) !== expected) {
+      throw new Error(`${name} must match the confirmed pre-enable configuration.`);
+    }
+  }
+  const secretNames = JSON.parse(runGh(config, ['secret', 'list', '--repo', config.repository, '--json', 'name']));
+  if (
+    !Array.isArray(secretNames) ||
+    ![config.modelSecret, config.handoffSecret].every((name) => secretNames.some(({ name: found }) => found === name))
+  ) {
+    throw new Error('Configured model and hand-off secret names must both exist in the repository.');
+  }
+}
+
+function runGh(config, args) {
+  try {
+    return (config.execute ?? execFileSync)('gh', args, { encoding: 'utf8' }).trim();
+  } catch (error) {
+    throw new Error('Could not inspect live repository configuration with gh.', { cause: error });
+  }
 }
 
 function parseArguments(args) {
@@ -142,6 +178,7 @@ function parseArguments(args) {
   if (!['preflight', 'installed'].includes(mode)) throw new Error('--mode must be preflight or installed.');
   const config = {
     root: values['--root'],
+    repository: values['--repository'],
     runnerLabel: values['--runner-label'],
     modelSecret: values['--model-secret'],
     handoffSecret: values['--handoff-secret'],

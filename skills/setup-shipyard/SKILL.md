@@ -58,7 +58,7 @@ un-pinned image, invalid endpoint, or missing model selection before any target
 repository file changes:
 
 ```text
-node /path/to/setup-shipyard/validate.mjs --mode preflight --root /path/to/repo \
+node /path/to/setup-shipyard/validate.mjs --mode preflight --root /path/to/repo --repository owner/repo \
   --runner-label dedicated-runner --model-secret LLM_API_KEY \
   --handoff-secret SHIPYARD_HANDOFF_TOKEN --sandbox-image registry/image@sha256:<64-lowercase-hex> \
   --base-url https://provider.example/v1 --reviewer-model provider/reviewer \
@@ -163,9 +163,11 @@ node /path/to/setup-shipyard/validate.mjs --mode preflight --root /path/to/repo 
 5. Run the bundled validator again in `installed` mode with the same values.
    It accepts only the two complete bundled templates with the confirmed runner,
    secret names and Coder image substituted. This proves the action versions,
-   model-Variable wiring, runner labels, permissions, Coder image/readiness,
-   Reviewer no-checkout/no-shell boundary, and the target `AGENTS.md` contract.
-   Do not call setup complete unless it passes.
+   model-Variable wiring, runner labels, permissions, Coder image, Reviewer
+   no-checkout/no-shell boundary, and the target `AGENTS.md` contract. Using
+   `gh`, it also proves the configured Variables are live, Coder admission is
+   still `false`, and the two required secret _names_ exist without reading
+   their values. Do not call setup complete unless it passes.
 
 ## Hand off to normal Shipyard operation
 
