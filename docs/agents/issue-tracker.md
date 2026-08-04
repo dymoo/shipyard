@@ -52,10 +52,11 @@ than guessing.
 
 The cloud coder works only on an eligible issue or a trusted same-repository
 draft pull request. It creates or updates a draft pull request, runs the
-repository's checks, and performs a bounded adversarial-review-and-repair pass.
-It then removes `ready-for-agent`, applies `ready-for-human`, and leaves a
-handoff comment with the Agent Brief, commands run, commits, review findings,
-and remaining risks.
+repository's checks, and hands it to the independent cloud reviewer. That
+reviewer can request exactly one verified repair; after the first clean review
+or that repair review, it applies `ready-for-human` to the pull request and
+leaves its review summary. The issue's `ready-for-agent` label is an admission
+event, not a mutable state machine.
 
 `ready-for-human` means the user's local Codex or Claude Code session, or a
 human, decides whether to request more work, merge, or return the item to

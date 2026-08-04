@@ -89,7 +89,7 @@ export function reasoningEffortForComplexity(config, complexity) {
   return complexity <= 3 ? config.lunaReasoningEffort : config.terraReasoningEffort;
 }
 
-/** Resolve only a ready-for-agent Issue label event. */
+/** Resolve a new ready-for-agent Issue or one bounded reviewer-repair event. */
 export function readIssueEvent() {
   const [owner, repo] = requiredEnv('GITHUB_REPOSITORY').split('/');
   if (!owner || !repo) throw new Error('GITHUB_REPOSITORY must be in owner/repository form.');
@@ -97,6 +97,17 @@ export function readIssueEvent() {
   const eventPath = requiredEnv('GITHUB_EVENT_PATH');
   if (!fs.existsSync(eventPath)) throw new Error(`GITHUB_EVENT_PATH does not exist: ${eventPath}`);
   const payload = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
+  if (eventName === 'repository_dispatch') {
+    if (payload.action !== 'shipyard-repair')
+      return { owner, repo, skip: 'repository dispatch is not for Shipyard repair' };
+    const issueNumber = payload.client_payload?.issue;
+    const pullNumber = payload.client_payload?.pull_request;
+    const repairRound = payload.client_payload?.repair_round;
+    if (!Number.isInteger(issueNumber) || !Number.isInteger(pullNumber) || repairRound !== 1) {
+      return { owner, repo, skip: 'repair dispatch did not include the expected Issue, PR, and round' };
+    }
+    return { owner, repo, issueNumber, pullNumber, repairRound };
+  }
   if (eventName !== 'issues' || payload.action !== 'labeled' || payload.label?.name !== 'ready-for-agent') {
     return { owner, repo, skip: 'event is not a ready-for-agent Issue label' };
   }

@@ -125,6 +125,8 @@ function requiredHttpUrl(name, value) {
  * @property {number|null} [prNumber]
  * @property {string} [trigger]
  * @property {string} [focus]
+ * @property {number} [codingIssue]
+ * @property {number} [repairRound]
  * @property {string} [skip]
  */
 
@@ -171,7 +173,18 @@ export function readEvent() {
     if (!Number.isInteger(prNumber) || prNumber < 1) {
       return { ...base, skip: 'repository dispatch did not include a pull request number' };
     }
-    return { ...base, prNumber, trigger: 'cloud-coder' };
+    const codingIssue = payload.client_payload?.issue;
+    const repairRound = payload.client_payload?.repair_round;
+    if (
+      !Number.isInteger(codingIssue) ||
+      codingIssue < 1 ||
+      !Number.isInteger(repairRound) ||
+      repairRound < 0 ||
+      repairRound > 1
+    ) {
+      return { ...base, skip: 'repository dispatch did not include a valid Cloud Coder Issue and repair round' };
+    }
+    return { ...base, prNumber, trigger: 'cloud-coder', codingIssue, repairRound };
   }
 
   if (eventName === 'pull_request' || eventName === 'pull_request_target') {

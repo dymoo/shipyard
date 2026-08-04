@@ -57,6 +57,44 @@ export function deleteBranch(gh, { owner, repo, branch }) {
   return gh.request('DELETE', `/repos/${owner}/${repo}/git/refs/heads/${encodeURIComponent(branch)}`);
 }
 
+/** Add one tested repair commit to the exact pull-request head, never force-pushing. */
+export async function appendChanges(gh, { owner, repo, branch, expectedSha, changes, message }) {
+  if (!changes.length) throw new Error('Cloud Coder repair requires at least one workspace change.');
+  for (const change of changes) {
+    if (!isSafeRepoPath(change.path))
+      throw new Error(`Cloud Coder change is not a safe repository path: ${change.path}`);
+    if (change.content !== null && typeof change.content !== 'string') {
+      throw new Error(`Cloud Coder change content must be text or deletion: ${change.path}`);
+    }
+  }
+  const encodedBranch = encodeURIComponent(branch);
+  const ref = await gh.request('GET', `/repos/${owner}/${repo}/git/ref/heads/${encodedBranch}`);
+  const parent = ref.data?.object?.sha;
+  if (parent !== expectedSha) throw new Error('Cloud Coder repair branch moved; refusing to overwrite it.');
+  const commit = await gh.request('GET', `/repos/${owner}/${repo}/git/commits/${encodeURIComponent(parent)}`);
+  const tree = [];
+  for (const change of changes) {
+    if (change.content === null) {
+      tree.push({ path: change.path, mode: '100644', type: 'blob', sha: null });
+      continue;
+    }
+    const blob = await gh.request('POST', `/repos/${owner}/${repo}/git/blobs`, {
+      body: { content: change.content, encoding: 'utf-8' },
+    });
+    tree.push({ path: change.path, mode: '100644', type: 'blob', sha: blob.data.sha });
+  }
+  const nextTree = await gh.request('POST', `/repos/${owner}/${repo}/git/trees`, {
+    body: { base_tree: commit.data.tree.sha, tree },
+  });
+  const nextCommit = await gh.request('POST', `/repos/${owner}/${repo}/git/commits`, {
+    body: { message, tree: nextTree.data.sha, parents: [parent] },
+  });
+  await gh.request('PATCH', `/repos/${owner}/${repo}/git/refs/heads/${encodedBranch}`, {
+    body: { sha: nextCommit.data.sha, force: false },
+  });
+  return nextCommit.data.sha;
+}
+
 export function createDraftPull(gh, { owner, repo, branch, base, issue }) {
   return gh
     .request('POST', `/repos/${owner}/${repo}/pulls`, {

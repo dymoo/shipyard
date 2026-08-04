@@ -44,6 +44,7 @@ async function main() {
     const summary = renderSummary(emptyResult(pr, skipped), config);
     core.appendSummary(summary);
     await upsertSummary(gh, ctx, summary);
+    await handoffCloudCoder(gh, ctx, pr, 0);
     setOutputs(true, 0);
     return;
   }
@@ -197,7 +198,34 @@ async function main() {
   }));
   await postInline(gh, ctx, pr, comments);
   await upsertSummary(gh, ctx, summary, issueComments);
+  await handoffCloudCoder(gh, ctx, pr, findings.length);
   setOutputs(true, findings.length);
+}
+
+/** Complete the one permitted Coder/Reviewer repair cycle; never merge code. */
+async function handoffCloudCoder(gh, ctx, pr, findings) {
+  if (ctx.trigger !== 'cloud-coder' || !ctx.codingIssue || ctx.repairRound === undefined) return;
+  if (!pr.draft || pr.head?.ref !== `shipyard/issue-${ctx.codingIssue}`) {
+    core.warning('Cloud Coder hand-off refused for a pull request outside the generated draft branch.');
+    return;
+  }
+
+  if (findings && ctx.repairRound === 0) {
+    await gh.request('POST', `/repos/${ctx.owner}/${ctx.repo}/dispatches`, {
+      body: {
+        event_type: 'shipyard-repair',
+        client_payload: { issue: ctx.codingIssue, pull_request: pr.number, repair_round: 1 },
+      },
+    });
+    core.info(`Requested one Cloud Coder repair for Issue #${ctx.codingIssue}.`);
+    return;
+  }
+
+  await gh.request('PATCH', `/repos/${ctx.owner}/${ctx.repo}/pulls/${pr.number}`, { body: { draft: false } });
+  await gh.request('POST', `/repos/${ctx.owner}/${ctx.repo}/issues/${pr.number}/labels`, {
+    body: { labels: ['ready-for-human'] },
+  });
+  core.info(`Draft PR #${pr.number} is ready for human or local-orchestrator review.`);
 }
 
 async function gatherContext({ llm, repo, rulesRepo, selected, diffText, pr, config }) {

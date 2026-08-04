@@ -48,12 +48,11 @@ Shipyard.
 3. Place the latest Agent Brief on the leaf work item. It must state the desired
    change, acceptance checks, files/boundary, test command, dependencies,
    risks, and complexity score.
-4. Apply `ready-for-agent`. This is the dispatch gate for Cloud Coder after it
-   is released.
-5. Cloud Coder produces first commits, tests, and bounded repair passes. Cloud
-   Reviewer independently reviews the draft. Cloud Coder may repair verified
-   findings within its bounded run.
-6. The workflow applies `ready-for-human`. Return to the local coding tool or a
+4. Apply `ready-for-agent`. This is the dispatch gate for Cloud Coder.
+5. Cloud Coder produces first commits and tests. Cloud Reviewer independently
+   reviews the draft; it either requests one repair with verified findings or
+   marks the draft ready for review. Cloud Coder may make that one repair.
+6. The workflow applies `ready-for-human` to the pull request. Return to the local coding tool or a
    human for final review, merge, or re-triage. Shipyard never auto-merges.
 
 ## Cloud Coder context contract
@@ -72,6 +71,6 @@ the local session before dispatch.
 ## Current release boundary
 
 Cloud Reviewer is available now as `dymoo/shipyard@v3`; see the README for
-the exact workflow. Cloud Coder is still being built. Until it is released, the
-Shipyard skill helps create the right backlog and reviewer installation, but it
-must not fabricate a Cloud Coder workflow or claim a job was dispatched.
+the exact workflow. Cloud Coder is in development; until it is released, use
+the provided workflow as a contract only and retain its `<released-version>`
+placeholder.

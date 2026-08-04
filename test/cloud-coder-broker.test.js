@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { branchForIssue, createDraftPull, publishChanges } from '../cloud-coder/src/broker.js';
+import { appendChanges, branchForIssue, createDraftPull, publishChanges } from '../cloud-coder/src/broker.js';
 
 test('publishes one non-force commit from a checked workspace change set', async () => {
   const calls = [];
@@ -104,4 +104,47 @@ test('removes a newly-created branch when Git Data publishing fails', async () =
     /unavailable/i,
   );
   assert.deepEqual(calls.at(-1), { method: 'DELETE', path: '/repos/o/r/git/refs/heads/shipyard%2Fissue-8' });
+});
+
+test('adds a repair only when the draft branch is still at the reviewed commit', async () => {
+  const calls = [];
+  const gh = {
+    async request(method, path, options = {}) {
+      calls.push({ method, path, body: options.body });
+      if (path === '/repos/o/r/git/ref/heads/shipyard%2Fissue-7') return { data: { object: { sha: 'reviewed-sha' } } };
+      if (path === '/repos/o/r/git/commits/reviewed-sha') return { data: { tree: { sha: 'reviewed-tree' } } };
+      if (path === '/repos/o/r/git/blobs') return { data: { sha: 'repair-blob' } };
+      if (path === '/repos/o/r/git/trees') return { data: { sha: 'repair-tree' } };
+      if (path === '/repos/o/r/git/commits') return { data: { sha: 'repair-commit' } };
+      if (path === '/repos/o/r/git/refs/heads/shipyard%2Fissue-7') return { data: {} };
+      throw new Error(`Unexpected ${method} ${path}`);
+    },
+  };
+
+  await appendChanges(gh, {
+    owner: 'o',
+    repo: 'r',
+    branch: 'shipyard/issue-7',
+    expectedSha: 'reviewed-sha',
+    changes: [{ path: 'src/app.js', content: 'export const repaired = true;\n' }],
+    message: 'Shipyard: repair #7 after Cloud Reviewer',
+  });
+  assert.deepEqual(calls.at(-1), {
+    method: 'PATCH',
+    path: '/repos/o/r/git/refs/heads/shipyard%2Fissue-7',
+    body: { sha: 'repair-commit', force: false },
+  });
+
+  await assert.rejects(
+    () =>
+      appendChanges(gh, {
+        owner: 'o',
+        repo: 'r',
+        branch: 'shipyard/issue-7',
+        expectedSha: 'different-sha',
+        changes: [{ path: 'src/app.js', content: 'x' }],
+        message: 'repair',
+      }),
+    /branch moved/i,
+  );
 });

@@ -14,8 +14,8 @@ merge decision.
 
 **Released now:** Shipyard Cloud Reviewer at `dymoo/shipyard@v3`.
 
-**Being built here:** Shipyard Cloud Coder. Do not add a fictional coder
-workflow before that action is released.
+**In development:** Shipyard Cloud Coder. Its workflow is intentionally shown
+with `<released-version>` until the action is released.
 
 ## The loop
 
@@ -76,7 +76,10 @@ on:
     types: [shipyard-review]
 
 permissions:
-  contents: read
+  # The fixed Coder repair hand-off needs repository_dispatch. This token is
+  # never exposed to the Cloud Reviewer model.
+  contents: write
+  issues: write
   pull-requests: write
 
 concurrency:
@@ -86,7 +89,8 @@ concurrency:
 jobs:
   review:
     if: >-
-      github.event_name == 'pull_request_target' ||
+      (github.event_name == 'pull_request_target' &&
+       !startsWith(github.event.pull_request.head.ref, 'shipyard/issue-')) ||
       github.event_name == 'repository_dispatch' ||
       (github.event.issue.pull_request && contains(github.event.comment.body, '@shipyard'))
     runs-on: ubuntu-latest
@@ -106,6 +110,11 @@ credential.
 The workflow intentionally has **no checkout**. `pull_request_target` remains
 safe only because Cloud Reviewer reads the pull-request snapshot and never
 executes its code. Do not add a head-ref checkout, install, build or shell step.
+The action's host code uses its GitHub token only for its fixed, non-model-led
+handoff: request one Coder repair or mark the Coder's draft PR ready for review.
+It skips ordinary pull-request events for generated `shipyard/issue-*` branches:
+the repository-dispatch run is the single review-and-handoff authority for those
+drafts.
 
 An owner, member or collaborator can request focused guidance with:
 

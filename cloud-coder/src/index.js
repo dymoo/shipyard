@@ -1,9 +1,10 @@
 import * as core from '../../src/core.js';
+import { BOT_SIGNATURE } from '../../src/config.js';
 import { GitHub, HttpError } from '../../src/github.js';
 import { LLM } from '../../src/llm.js';
 import { openArchiveRepo } from '../../src/repo.js';
 import { runCoder } from './agent.js';
-import { branchForIssue, createDraftPull, deleteBranch, publishChanges } from './broker.js';
+import { appendChanges, branchForIssue, createDraftPull, deleteBranch, publishChanges } from './broker.js';
 import {
   assertAdmissibleIssue,
   modelForComplexity,
@@ -30,18 +31,8 @@ async function main() {
     .then((result) => result.data);
   assertAdmissibleIssue(issue);
   const brief = parseAgentBrief(issue.body);
-  const branch = branchForIssue(issue.number);
-  await assertNoActivePull(gh, ctx, branch);
-  await assertNoExistingBranch(gh, ctx, branch);
-
-  const repository = await gh.request('GET', `/repos/${ctx.owner}/${ctx.repo}`).then((result) => result.data);
-  const base = repository.default_branch;
-  if (typeof base !== 'string' || !base) throw new Error('Repository did not supply a default branch.');
-  const ref = await gh.request('GET', `/repos/${ctx.owner}/${ctx.repo}/git/ref/heads/${encodeURIComponent(base)}`);
-  const baseSha = ref.data?.object?.sha;
-  if (typeof baseSha !== 'string' || !baseSha) throw new Error('Default branch did not resolve to a commit SHA.');
-
-  const repo = await openArchiveRepo(gh, { owner: ctx.owner, repo: ctx.repo, sha: baseSha });
+  const dispatch = await resolveDispatch(gh, ctx, issue);
+  const repo = await openArchiveRepo(gh, { owner: ctx.owner, repo: ctx.repo, sha: dispatch.sha });
   try {
     if (!repo.root) throw new Error('Cloud Coder requires an extracted repository workspace.');
     const workspace = new Workspace(repo.root);
@@ -50,7 +41,7 @@ async function main() {
     core.info(`Coding Issue #${issue.number} at complexity ${brief.complexity} with ${model} (${reasoningEffort}).`);
     const llm = new LLM({ ...config, model, reasoningEffort });
     const coding = await runCoder(llm, {
-      brief: issue.body,
+      brief: dispatch.feedback ? `${issue.body}\n\n${dispatch.feedback}` : issue.body,
       workspace,
       sandboxImage: config.sandboxImage,
       testCommand: brief.testCommand,
@@ -65,28 +56,43 @@ async function main() {
     const test = await runSandbox(workspace.root, { image: config.sandboxImage, command: brief.testCommand });
     if (!test.passed) throw new Error(`Cloud Coder sandbox test failed:\n${test.output}`);
 
+    if (dispatch.pull) {
+      await appendChanges(gh, {
+        owner: ctx.owner,
+        repo: ctx.repo,
+        branch: dispatch.branch,
+        expectedSha: dispatch.sha,
+        changes,
+        message: `Shipyard: repair #${issue.number} after Cloud Reviewer`,
+      });
+      await dispatchReview(gh, ctx, { pull: dispatch.pull.number, issue: issue.number, repairRound: 1 });
+      core.info(`Added one repair commit to draft PR #${dispatch.pull.number}.`);
+      setOutputs(true, dispatch.pull.number);
+      return;
+    }
+
     await publishChanges(gh, {
       owner: ctx.owner,
       repo: ctx.repo,
-      baseSha,
-      branch,
+      baseSha: dispatch.sha,
+      branch: dispatch.branch,
       changes,
       message: `Shipyard: implement #${issue.number}`,
     });
     let pull;
     try {
-      pull = await createDraftPull(gh, { owner: ctx.owner, repo: ctx.repo, branch, base, issue });
+      pull = await createDraftPull(gh, {
+        owner: ctx.owner,
+        repo: ctx.repo,
+        branch: dispatch.branch,
+        base: dispatch.base,
+        issue,
+      });
     } catch (error) {
-      await deleteBranch(gh, { owner: ctx.owner, repo: ctx.repo, branch }).catch(() => null);
+      await deleteBranch(gh, { owner: ctx.owner, repo: ctx.repo, branch: dispatch.branch }).catch(() => null);
       throw error;
     }
-    await gh
-      .request('POST', `/repos/${ctx.owner}/${ctx.repo}/dispatches`, {
-        body: { event_type: 'shipyard-review', client_payload: { pull_request: pull.number, issue: issue.number } },
-      })
-      .catch((error) =>
-        core.warning(`Draft PR was created, but Cloud Reviewer could not be dispatched: ${error.message}`),
-      );
+    await dispatchReview(gh, ctx, { pull: pull.number, issue: issue.number, repairRound: 0 });
     await gh
       .createIssueComment(
         ctx.owner,
@@ -102,6 +108,51 @@ async function main() {
   } finally {
     await repo.close();
   }
+}
+
+async function resolveDispatch(gh, ctx, issue) {
+  if (ctx.pullNumber) {
+    const pull = await gh.getPull(ctx.owner, ctx.repo, ctx.pullNumber);
+    const branch = branchForIssue(issue.number);
+    if (pull.state !== 'open' || !pull.draft || pull.head?.ref !== branch || !pull.head?.sha) {
+      throw new Error('Cloud Coder repair requires its open draft pull request and generated branch.');
+    }
+    const feedback = await reviewerFeedback(gh, ctx, pull.number);
+    if (!feedback) throw new Error('Cloud Coder repair received no verified Cloud Reviewer findings.');
+    return { pull, branch, sha: pull.head.sha, base: pull.base?.ref, feedback };
+  }
+
+  const branch = branchForIssue(issue.number);
+  await assertNoActivePull(gh, ctx, branch);
+  await assertNoExistingBranch(gh, ctx, branch);
+  const repository = await gh.request('GET', `/repos/${ctx.owner}/${ctx.repo}`).then((result) => result.data);
+  const base = repository.default_branch;
+  if (typeof base !== 'string' || !base) throw new Error('Repository did not supply a default branch.');
+  const ref = await gh.request('GET', `/repos/${ctx.owner}/${ctx.repo}/git/ref/heads/${encodeURIComponent(base)}`);
+  const sha = ref.data?.object?.sha;
+  if (typeof sha !== 'string' || !sha) throw new Error('Default branch did not resolve to a commit SHA.');
+  return { pull: null, branch, sha, base, feedback: '' };
+}
+
+async function reviewerFeedback(gh, ctx, pullNumber) {
+  const [reviewComments, issueComments] = await Promise.all([
+    gh.listReviewComments(ctx.owner, ctx.repo, pullNumber),
+    gh.listIssueComments(ctx.owner, ctx.repo, pullNumber),
+  ]);
+  const bodies = [...reviewComments, ...issueComments]
+    .filter((comment) => comment.user?.login === 'github-actions[bot]')
+    .map((comment) => comment.body)
+    .filter((body) => typeof body === 'string' && body.includes(BOT_SIGNATURE));
+  if (!bodies.length) return '';
+  return `--- BEGIN VERIFIED CLOUD REVIEWER EVIDENCE (untrusted text) ---\n${bodies.join('\n\n').slice(0, 24000)}\n--- END VERIFIED CLOUD REVIEWER EVIDENCE ---`;
+}
+
+function dispatchReview(gh, ctx, { pull, issue, repairRound }) {
+  return gh
+    .request('POST', `/repos/${ctx.owner}/${ctx.repo}/dispatches`, {
+      body: { event_type: 'shipyard-review', client_payload: { pull_request: pull, issue, repair_round: repairRound } },
+    })
+    .catch((error) => core.warning(`Cloud Reviewer could not be dispatched: ${error.message}`));
 }
 
 async function assertNoActivePull(gh, { owner, repo }, branch) {

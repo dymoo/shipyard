@@ -3,6 +3,8 @@ name: Shipyard Cloud Coder
 on:
   issues:
     types: [labeled]
+  repository_dispatch:
+    types: [shipyard-repair]
 
 permissions:
   contents: write
@@ -10,15 +12,17 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: shipyard-coder-issue-${{ github.event.issue.number }}
+  group: shipyard-coder-issue-${{ github.event.issue.number || github.event.client_payload.issue }}
   cancel-in-progress: false
 
 jobs:
   code:
     if: >-
-      github.event.action == 'labeled' &&
-      github.event.label.name == 'ready-for-agent' &&
-      !github.event.issue.pull_request
+      (github.event_name == 'issues' &&
+       github.event.action == 'labeled' &&
+       github.event.label.name == 'ready-for-agent' &&
+       !github.event.issue.pull_request) ||
+      github.event_name == 'repository_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:

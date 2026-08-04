@@ -71,16 +71,23 @@ API-key-only. ChatGPT subscription OAuth is deferred in
 Cloud Coder's separate public inputs are `api-key`, `base-url`, `luna-model`,
 `terra-model`, `luna-reasoning-effort`, `terra-reasoning-effort`,
 `github-token` and `sandbox-image`. Scores 1–3 use Luna and scores 4–5 use
-Terra; both default to `xhigh`. It triggers only from an `issues` label
-event for `ready-for-agent`; it accepts an open Issue rather than a PR. The
-workflow must grant only `contents: write`, `issues: write` and
+Terra; both default to `xhigh`. It triggers from an `issues` label event for
+`ready-for-agent` or its one trusted `shipyard-repair` repository dispatch; it
+accepts an open Issue rather than a PR. The workflow must grant only
+`contents: write`, `issues: write` and
 `pull-requests: write`, must not check out repository code, and must pass a
 SHA-256 digest-pinned test image with a fixed job timeout. The Coder's host-side broker creates one
 `shipyard/issue-<number>` branch, one non-force commit and one draft PR only
 after the fixed Agent Brief test command passes in a no-network container.
 It then emits the `shipyard-review` repository-dispatch event; the separate
 Cloud Reviewer workflow must listen for that event so it runs with its own
-configured model and API key.
+configured model and API key. For Coder-dispatched reviews only, the review
+host either emits one `shipyard-repair` event with bot-authored, verified
+findings or changes the Coder draft to ready-for-review and applies
+`ready-for-human`; it never lets the review model invoke GitHub mutations. The
+review workflow skips ordinary pull-request events for generated
+`shipyard/issue-*` branches so the repository-dispatch run is the only Coder
+review-and-handoff authority.
 
 ## Agent skills
 
@@ -234,6 +241,10 @@ Keep the diff to one purpose. If it does two things, it is two pull requests.
 
 ## Changelog
 
+- 2026-08-04: Completed the finite Cloud Coder/Reviewer loop: one dispatched
+  reviewer repair, protected non-force repair commit, then `ready-for-human`
+  hand-off by a fixed host-side transition; generated branches skip duplicate
+  pull-request review runs.
 - 2026-08-04: Added the Cloud Coder Issue-to-draft-PR vertical slice: a
   label-gated Issue Action, bounded coding tools, archive workspace, final
   no-network test, non-force Git Data commit and draft PR broker.

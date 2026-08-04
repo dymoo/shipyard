@@ -70,11 +70,18 @@ test('pull request events run and unrelated events skip', () => {
 test('a Shipyard repository dispatch schedules the named pull request', () => {
   const ctx = withEvent(
     'repository_dispatch',
-    { action: 'shipyard-review', client_payload: { pull_request: 42 } },
+    { action: 'shipyard-review', client_payload: { pull_request: 42, issue: 7, repair_round: 0 } },
     readEvent,
   );
   assert.equal(ctx.prNumber, 42);
   assert.equal(ctx.trigger, 'cloud-coder');
+  assert.equal(ctx.codingIssue, 7);
+  assert.equal(ctx.repairRound, 0);
+  assert.match(
+    withEvent('repository_dispatch', { action: 'shipyard-review', client_payload: { pull_request: 42 } }, readEvent)
+      .skip,
+    /Issue and repair round/,
+  );
   assert.equal(
     withEvent('repository_dispatch', { action: 'other', client_payload: { pull_request: 42 } }, readEvent).skip,
     'repository dispatch is not for Shipyard review',
