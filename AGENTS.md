@@ -80,8 +80,8 @@ Cloud Coder's separate public inputs are `api-key`, `base-url`,
 `github-token`, `handoff-token` and `sandbox-image`. Scores 1–3 use the
 configured low-complexity model and scores 4–5 use the configured
 high-complexity model; reasoning effort is optional and omitted when empty. It
-accepts the prior Luna/Terra-named inputs as deprecated compatibility aliases
-without model defaults; new workflows must use the generic tier names. It
+uses generic tier inputs only in v4; the unchanged v3 tag retains the legacy
+Luna/Terra-named interface for existing callers. It
 triggers from an `issues` label event for `ready-for-agent` or its one trusted
 `shipyard-repair` repository dispatch; it accepts an open Issue rather than a
 PR. The workflow must grant only
