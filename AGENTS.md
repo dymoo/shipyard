@@ -85,24 +85,25 @@ API-key-only. ChatGPT subscription OAuth is deferred in
 One responsibility per file. If you cannot say what a file is for in one line,
 it needs splitting.
 
-| File              | Owns                                                  |
-| ----------------- | ----------------------------------------------------- |
-| `src/index.js`    | Orchestration. No business logic.                     |
-| `src/config.js`   | Six inputs, fixed limits and event resolution         |
-| `src/prompts.js`  | Every prompt. The product's actual IP.                |
-| `src/schema.js`   | JSON Schemas for structured replies. Authoritative.   |
-| `src/review.js`   | The model passes: find and refute                     |
-| `src/findings.js` | The finding data model: normalise, merge, fingerprint |
-| `src/diff.js`     | Diff parsing and comment anchoring                    |
-| `src/context.js`  | File selection, context widening, chunking            |
-| `src/codebase.js` | Base-commit project-rule discovery                    |
-| `src/repo.js`     | Repository access at the head commit                  |
-| `src/agent.js`    | Read-only tools and the bounded investigation loop    |
-| `src/llm.js`      | OpenAI-compatible client, defensive JSON              |
-| `src/github.js`   | REST client                                           |
-| `src/post.js`     | Comment and summary rendering, posting                |
-| `src/core.js`     | The small `@actions/core` replacement                 |
-| `preflight/`      | Source-free OpenRouter policy and route verification  |
+| File              | Owns                                                                     |
+| ----------------- | ------------------------------------------------------------------------ |
+| `src/index.js`    | Orchestration. No business logic.                                        |
+| `src/config.js`   | Six inputs, fixed limits and event resolution                            |
+| `src/prompts.js`  | Every prompt. The product's actual IP.                                   |
+| `src/schema.js`   | JSON Schemas for structured replies. Authoritative.                      |
+| `src/review.js`   | The model passes: find and refute                                        |
+| `src/findings.js` | The finding data model: normalise, merge, fingerprint                    |
+| `src/diff.js`     | Diff parsing and comment anchoring                                       |
+| `src/context.js`  | File selection, context widening, chunking                               |
+| `src/codebase.js` | Base-commit project-rule discovery                                       |
+| `src/repo.js`     | Repository access at the head commit                                     |
+| `src/agent.js`    | Read-only tools and the bounded investigation loop                       |
+| `src/llm.js`      | OpenAI-compatible client, defensive JSON                                 |
+| `src/github.js`   | REST client                                                              |
+| `src/post.js`     | Comment and summary rendering, posting                                   |
+| `src/core.js`     | The small `@actions/core` replacement                                    |
+| `preflight/`      | Source-free OpenRouter policy and route verification                     |
+| `cloud-coder/`    | Separate Coder boundary: skills, mutable workspace and sandbox prototype |
 
 Dependencies point one way: `index.js` → everything, and modules do not import
 their callers. `post.js` must not import `review.js`; anything both need lives in
@@ -183,6 +184,9 @@ changed line and flags it`, not `test anchorFinding 3`.
 - `test/e2e.test.js` runs the real entrypoint against a stub GitHub API and a
   stub model. Anything touching orchestration, event handling or the request
   sequence belongs there.
+- Cloud Coder tests must prove the admission gate, lazy allowlisted skill
+  loading, workspace containment and Docker isolation without running Docker
+  or repository code in the test process.
 
 ## Prompts
 
@@ -216,6 +220,9 @@ Keep the diff to one purpose. If it does two things, it is two pull requests.
 
 ## Changelog
 
+- 2026-08-04: Added the isolated Cloud Coder v1 security prototype: strict
+  Issue Brief admission, lazy immutable implementation skills, contained
+  workspace edits and a credential-free no-network Docker test boundary.
 - 2026-08-04: Removed the review client's completion-token cap; providers and
   models now control output length while request and input-context limits remain
   fixed.
