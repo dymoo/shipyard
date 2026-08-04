@@ -168,6 +168,8 @@ function dispatchReview(gh, ctx, config, { pull, issue, repairRound, headSha }) 
         head_sha: headSha,
         handoff_proof: createHandoffProof(config.handoffToken, {
           direction: 'review',
+          owner: ctx.owner,
+          repo: ctx.repo,
           issue,
           pull,
           repairRound,

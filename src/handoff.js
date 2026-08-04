@@ -1,10 +1,10 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 /** Bind a dispatch proof to the only state transition its receiver may make. */
-export function createHandoffProof(secret, { direction, issue, pull, repairRound, headSha }) {
+export function createHandoffProof(secret, { direction, owner, repo, issue, pull, repairRound, headSha }) {
   if (typeof secret !== 'string' || !secret) throw new Error('Shipyard hand-off token is required.');
   return createHmac('sha256', secret)
-    .update([direction, issue, pull, repairRound, headSha].join('\n'))
+    .update([direction, owner, repo, issue, pull, repairRound, headSha].join('\n'))
     .digest('base64url');
 }
 

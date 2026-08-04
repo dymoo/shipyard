@@ -82,7 +82,7 @@ after the fixed Agent Brief test command passes in a no-network container.
 It then emits the `shipyard-review` repository-dispatch event; the separate
 Cloud Reviewer workflow must listen for that event so it runs with its own
 configured model and API key. Both actions accept that dispatch only with an
-HMAC proof over its direction, Issue, PR, repair round and exact head SHA;
+HMAC proof over its repository, direction, Issue, PR, repair round and exact head SHA;
 they never put the shared secret in event storage or model context. For Coder-dispatched reviews
 only, the review
 host either emits one `shipyard-repair` event with bot-authored, verified
@@ -246,7 +246,7 @@ Keep the diff to one purpose. If it does two things, it is two pull requests.
 ## Changelog
 
 - 2026-08-04: Bound Coder/Reviewer repository-dispatch hand-offs to HMAC proofs
-  over direction, Issue, PR, repair round and head SHA, without storing the
+  over repository, direction, Issue, PR, repair round and head SHA, without storing the
   shared secret in the payload. The receiver also verifies the live PR head.
 - 2026-08-04: Hardened Cloud Coder publication and hand-off: verify the base
   ref immediately before creating its branch, preserve regular-file mode, fail

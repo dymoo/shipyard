@@ -73,5 +73,5 @@ the local session before dispatch.
 Cloud Reviewer is available as `dymoo/shipyard@v3` and Cloud Coder as
 `dymoo/shipyard/cloud-coder@v3`; see the README for the exact workflows. Their
 repository-dispatch hand-offs require a HMAC proof bound to their direction,
-Issue, PR, repair round and exact head commit. The shared secret is never
+repository, Issue, PR, repair round and exact head commit. The shared secret is never
 retained in event payloads or exposed to a model.

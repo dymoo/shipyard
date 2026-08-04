@@ -15,8 +15,8 @@ no repository content.
 **Credentials.** Model, GitHub and HMAC hand-off keys are masked immediately.
 The reviewer key is sent only to `base-url`; the preflight key only to
 OpenRouter. There is no default or fallback model endpoint. Coder/Reviewer
-dispatches contain a HMAC proof over direction, Issue, PR, repair round and
-head SHA; the shared secret is never retained in an event payload or sent to a
+dispatches contain a HMAC proof over repository, direction, Issue, PR, repair
+round and head SHA; the shared secret is never retained in an event payload or sent to a
 model. Receivers reject a proof unless the live pull-request head still matches.
 
 **OpenRouter routing.** When `base-url` is exactly

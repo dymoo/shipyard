@@ -203,6 +203,8 @@ test('the Cloud Coder entrypoint tests and publishes one draft before dispatchin
         head_sha: 'next-commit',
         handoff_proof: createHandoffProof('handoff-secret', {
           direction: 'review',
+          owner: 'o',
+          repo: 'r',
           issue: 7,
           pull: 12,
           repairRound: 0,

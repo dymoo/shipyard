@@ -121,7 +121,7 @@ export function readIssueEvent(handoffToken = '') {
       !handoffToken ||
       !verifiesHandoffProof(
         handoffToken,
-        { direction: 'repair', issue: issueNumber, pull: pullNumber, repairRound, headSha },
+        { direction: 'repair', owner, repo, issue: issueNumber, pull: pullNumber, repairRound, headSha },
         payload.client_payload?.handoff_proof,
       )
     ) {

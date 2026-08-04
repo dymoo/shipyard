@@ -18,12 +18,12 @@ function withEnv(values, fn) {
   }
 }
 
-function withEvent(eventName, payload, fn) {
+function withEvent(eventName, payload, fn, repository = 'o/r') {
   const eventPath = path.join(tmp, `${Math.random().toString(36).slice(2)}.json`);
   fs.writeFileSync(eventPath, JSON.stringify(payload));
   return withEnv(
     {
-      GITHUB_REPOSITORY: 'o/r',
+      GITHUB_REPOSITORY: repository,
       GITHUB_EVENT_NAME: eventName,
       GITHUB_EVENT_PATH: eventPath,
     },
@@ -50,6 +50,8 @@ function reviewDispatch(overrides = {}) {
       ...payload,
       handoff_proof: createHandoffProof('handoff-secret', {
         direction: 'review',
+        owner: 'o',
+        repo: 'r',
         issue: payload.issue,
         pull: payload.pull_request,
         repairRound: payload.repair_round,
@@ -106,6 +108,11 @@ test('a forged Cloud Coder review dispatch cannot enter the reviewer workflow', 
   const dispatch = reviewDispatch();
   dispatch.client_payload.handoff_proof = 'forged';
   const ctx = withEvent('repository_dispatch', dispatch, () => readEvent('handoff-secret'));
+  assert.match(ctx.skip, /hand-off proof/i);
+});
+
+test('a proof from another repository cannot enter the reviewer workflow', () => {
+  const ctx = withEvent('repository_dispatch', reviewDispatch(), () => readEvent('handoff-secret'), 'other/r');
   assert.match(ctx.skip, /hand-off proof/i);
 });
 

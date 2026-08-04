@@ -209,6 +209,10 @@ async function main() {
 /** Complete the one permitted Coder/Reviewer repair cycle; never merge code. */
 async function handoffCloudCoder(gh, ctx, pr, config, findings) {
   if (ctx.trigger !== 'cloud-coder' || !ctx.codingIssue || ctx.repairRound === undefined) return;
+  pr = await gh.getPull(ctx.owner, ctx.repo, pr.number);
+  if (pr.head?.sha !== ctx.headSha) {
+    throw new Error('Cloud Coder hand-off no longer matches the pull request head.');
+  }
   if (!pr.draft || pr.head?.ref !== `shipyard/issue-${ctx.codingIssue}`) {
     core.warning('Cloud Coder hand-off refused for a pull request outside the generated draft branch.');
     return;
@@ -226,6 +230,8 @@ async function handoffCloudCoder(gh, ctx, pr, config, findings) {
           head_sha: pr.head.sha,
           handoff_proof: createHandoffProof(config.handoffToken, {
             direction: 'repair',
+            owner: ctx.owner,
+            repo: ctx.repo,
             issue: ctx.codingIssue,
             pull: pr.number,
             repairRound: 1,

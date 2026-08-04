@@ -51,6 +51,8 @@ function coderReviewDispatch(repairRound) {
       ...payload,
       handoff_proof: createHandoffProof('handoff-secret', {
         direction: 'review',
+        owner: 'o',
+        repo: 'r',
         issue: payload.issue,
         pull: payload.pull_request,
         repairRound: payload.repair_round,
@@ -129,7 +131,8 @@ function standardReply({ findings = FINDINGS, verdict = 'real' } = {}) {
  *   diffText?: string,
  *   symlinks?: Record<string, string>,
  *   issueComments?: any[],
- *   reviewComments?: any[]
+ *   reviewComments?: any[],
+ *   pullHeads?: string[]
  * }} [options]
  */
 async function stubServer({
@@ -141,6 +144,7 @@ async function stubServer({
   symlinks = {},
   issueComments = [],
   reviewComments = [],
+  pullHeads = [],
 } = {}) {
   const captured = {
     reviews: [],
@@ -152,6 +156,7 @@ async function stubServer({
     llmRequests: [],
   };
   const tarball = makeTarball(repoFiles, symlinks);
+  let pullReads = 0;
 
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
@@ -193,6 +198,7 @@ async function stubServer({
       }
       if (url.pathname === '/repos/o/r/pulls/1' && req.method === 'GET') {
         if ((req.headers.accept || '').includes('diff')) return send(200, diffText, 'text/plain');
+        const headSha = pullHeads[pullReads++] || 'headsha';
         return send(200, {
           number: 1,
           state: 'open',
@@ -200,7 +206,7 @@ async function stubServer({
           title: 'Guard the lookup',
           body: '',
           user: { login: 'alice' },
-          head: { sha: 'headsha', ref: 'shipyard/issue-7' },
+          head: { sha: headSha, ref: 'shipyard/issue-7' },
           base: { ref: 'main', sha: 'basesha' },
         });
       }
@@ -389,6 +395,8 @@ test('a Coder review dispatch requests exactly one repair when verified findings
         head_sha: 'headsha',
         handoff_proof: createHandoffProof('handoff-secret', {
           direction: 'repair',
+          owner: 'o',
+          repo: 'r',
           issue: 7,
           pull: 1,
           repairRound: 1,
@@ -447,6 +455,8 @@ test('a valid hand-off proof cannot review or mutate a pull request after its he
         ...payload,
         handoff_proof: createHandoffProof('handoff-secret', {
           direction: 'review',
+          owner: 'o',
+          repo: 'r',
           issue: payload.issue,
           pull: payload.pull_request,
           repairRound: payload.repair_round,
@@ -460,6 +470,21 @@ test('a valid hand-off proof cannot review or mutate a pull request after its he
   assert.deepEqual(captured.reviews, []);
   assert.deepEqual(captured.dispatchedEvents, []);
   assert.deepEqual(captured.updatedPulls, []);
+});
+
+test('a head change during review cannot mark a newer commit ready', async (t) => {
+  const { server, captured, port } = await stubServer({ pullHeads: ['headsha', 'new-head'] });
+  t.after(() => server.close());
+
+  const run = await runAction(port, {
+    GITHUB_EVENT_NAME: 'repository_dispatch',
+    __event: coderReviewDispatch(1),
+  });
+  assert.notEqual(run.code, 0);
+  assert.match(`${run.stdout}\n${run.stderr}`, /no longer matches the pull request head/);
+  assert.deepEqual(captured.dispatchedEvents, []);
+  assert.deepEqual(captured.updatedPulls, []);
+  assert.deepEqual(captured.labels, []);
 });
 
 test('the investigation can read repository evidence with tools', async (t) => {

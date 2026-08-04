@@ -200,7 +200,7 @@ export function readEvent(handoffToken = '') {
       !handoffToken ||
       !verifiesHandoffProof(
         handoffToken,
-        { direction: 'review', issue: codingIssue, pull: prNumber, repairRound, headSha },
+        { direction: 'review', owner, repo, issue: codingIssue, pull: prNumber, repairRound, headSha },
         payload.client_payload?.handoff_proof,
       )
     ) {

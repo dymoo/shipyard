@@ -105,8 +105,8 @@ Add `OPENAI_API_KEY` and a random `SHIPYARD_HANDOFF_TOKEN` under **Settings →
 Secrets and variables → Actions**. The reviewer needs an OpenAI-compatible Chat
 Completions endpoint with tool calling. It is API-key-only; a ChatGPT or Codex
 subscription is not a GitHub Actions credential. Coder/Reviewer repository
-dispatches carry an HMAC proof, bound to the direction, Issue, PR, repair round
-and exact head commit. The secret is never sent in a retained event payload or
+dispatches carry an HMAC proof, bound to the repository, direction, Issue, PR,
+repair round and exact head commit. The secret is never sent in a retained event payload or
 to either model.
 
 The workflow intentionally has **no checkout**. `pull_request_target` remains

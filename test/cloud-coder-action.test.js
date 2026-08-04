@@ -14,6 +14,8 @@ function repairDispatch(overrides = {}) {
       ...payload,
       handoff_proof: createHandoffProof('handoff-secret', {
         direction: 'repair',
+        owner: 'o',
+        repo: 'r',
         issue: payload.issue,
         pull: payload.pull_request,
         repairRound: payload.repair_round,
