@@ -5,6 +5,21 @@ import { fileURLToPath } from 'node:url';
 const SECRET_NAME = /^[A-Z][A-Z0-9_]*$/;
 const RUNNER_LABEL = /^[A-Za-z0-9_.-]+$/;
 const IMAGE_DIGEST = /^[\w./:-]+@sha256:[a-f0-9]{64}$/;
+const GITHUB_HOSTED_RUNNERS = new Set([
+  'ubuntu-latest',
+  'ubuntu-24.04',
+  'ubuntu-22.04',
+  'ubuntu-20.04',
+  'windows-latest',
+  'windows-2025',
+  'windows-2022',
+  'windows-2019',
+  'macos-latest',
+  'macos-15',
+  'macos-14',
+  'macos-13',
+  'macos-13-large',
+]);
 const SKILL_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const OPTIONS = new Set([
   '--mode',
@@ -18,17 +33,14 @@ const OPTIONS = new Set([
   '--low-complexity-model',
   '--high-complexity-model',
 ]);
-const AGENTS_REQUIREMENTS = [
-  '## Shipyard',
-  'The local Codex or Claude Code session owns Matt Pocock planning skills',
-  'Shipyard runs bounded Coder and independent Reviewer work in GitHub Actions; it never auto-merges.',
-  'Apply `ready-for-agent` only to an open GitHub Issue with a complete Agent Brief:',
-  'Coder requires a dedicated Docker-capable runner and a digest-pinned test image.',
-];
 
 export function validatePreflight(config) {
   requiredDirectory(config.root, 'Repository root');
-  if (!RUNNER_LABEL.test(config.runnerLabel) || config.runnerLabel === 'self-hosted') {
+  if (
+    !RUNNER_LABEL.test(config.runnerLabel) ||
+    config.runnerLabel === 'self-hosted' ||
+    GITHUB_HOSTED_RUNNERS.has(config.runnerLabel)
+  ) {
     throw new Error('Runner label must be a dedicated GitHub label, never "self-hosted".');
   }
   for (const [name, value] of [
@@ -100,10 +112,21 @@ function normaliseNewlines(value) {
 function validateAgents(root) {
   const agentsPath = path.join(root, 'AGENTS.md');
   if (!fs.existsSync(agentsPath)) throw new Error('AGENTS.md must contain the Shipyard contract.');
-  const agents = fs.readFileSync(agentsPath, 'utf8');
-  if (!AGENTS_REQUIREMENTS.every((requirement) => agents.includes(requirement))) {
+  const actual = markdownSection(fs.readFileSync(agentsPath, 'utf8'), 'Shipyard');
+  const templatePath = path.join(SKILL_DIRECTORY, 'templates', 'AGENTS.md');
+  const expected = fs.readFileSync(templatePath, 'utf8');
+  if (!actual || normaliseNewlines(actual).trimEnd() !== normaliseNewlines(expected).trimEnd()) {
     throw new Error('AGENTS.md must contain the complete Shipyard contract.');
   }
+}
+
+function markdownSection(document, name) {
+  const heading = new RegExp(`^## ${name}$`, 'm').exec(document);
+  if (!heading || heading.index === undefined) return null;
+  const followingHeading = /^## /gm;
+  followingHeading.lastIndex = heading.index + heading[0].length;
+  const next = followingHeading.exec(document);
+  return document.slice(heading.index, next?.index);
 }
 
 function parseArguments(args) {

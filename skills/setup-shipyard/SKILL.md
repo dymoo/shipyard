@@ -112,8 +112,10 @@ node /path/to/setup-shipyard/validate.mjs --mode preflight --root /path/to/repo 
    `SHIPYARD_CODER_READY` before either secret is removed or rotated, then repeat
    this verification before enabling it again.
 
-4. Merge this focused section into the target repository's root `AGENTS.md`.
-   Preserve all existing instructions and do not create a personal-only file.
+4. Merge this exact focused section into the target repository's root
+   `AGENTS.md`. `templates/AGENTS.md` is the validator's source of truth.
+   Preserve all existing instructions outside this section and do not create a
+   personal-only file.
 
    ```md
    ## Shipyard

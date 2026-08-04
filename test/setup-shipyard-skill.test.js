@@ -31,7 +31,7 @@ function writeInstalledFactory(root) {
   fs.mkdirSync(workflowDirectory, { recursive: true });
   fs.writeFileSync(
     path.join(root, 'AGENTS.md'),
-    `## Shipyard\n\nThe local Codex or Claude Code session owns Matt Pocock planning skills.\nShipyard runs bounded Coder and independent Reviewer work in GitHub Actions; it never auto-merges.\n\nApply \`ready-for-agent\` only to an open GitHub Issue with a complete Agent Brief:\n\nCoder requires a dedicated Docker-capable runner and a digest-pinned test image.\n`,
+    fs.readFileSync(new URL('../skills/setup-shipyard/templates/AGENTS.md', import.meta.url)),
   );
   for (const name of ['shipyard-reviewer.yml', 'shipyard-coder.yml']) {
     fs.writeFileSync(path.join(workflowDirectory, name), configuredWorkflow(name));
@@ -68,7 +68,8 @@ test('the setup skill installs only explicit, guarded Shipyard contracts', () =>
   assert.match(skill, /validate\.mjs --mode preflight/);
   assert.match(skill, /validator again in `installed` mode/i);
   assert.match(skill, /Do not manufacture a test\s+Issue or apply `ready-for-agent`/i);
-  assert.match(skill, /Merge this focused section into the target repository's root `AGENTS\.md`/);
+  assert.match(skill, /Merge this exact focused section into the target repository's root/i);
+  assert.match(skill, /`templates\/AGENTS\.md` is the validator's source of truth/i);
 });
 
 test('the setup validator rejects unsafe inputs before workflow edits', (t) => {
@@ -77,6 +78,7 @@ test('the setup validator rejects unsafe inputs before workflow edits', (t) => {
 
   assert.doesNotThrow(() => validatePreflight({ root, ...CONFIG }));
   assert.throws(() => validatePreflight({ root, ...CONFIG, runnerLabel: 'self-hosted' }), /dedicated GitHub label/i);
+  assert.throws(() => validatePreflight({ root, ...CONFIG, runnerLabel: 'ubuntu-latest' }), /dedicated GitHub label/i);
   assert.throws(() => validatePreflight({ root, ...CONFIG, sandboxImage: 'node:20' }), /SHA-256 digest/i);
   assert.throws(() => validatePreflight({ root, ...CONFIG, handoffSecret: CONFIG.modelSecret }), /different names/i);
 });
@@ -89,6 +91,12 @@ test('the setup validator accepts only a guarded installed factory', (t) => {
   assert.doesNotThrow(() => validateInstalled({ root, ...CONFIG }));
   fs.appendFileSync(path.join(root, '.github', 'workflows', 'shipyard-reviewer.yml'), '# uses: dymoo/shipyard@v3\n');
   assert.throws(() => validateInstalled({ root, ...CONFIG }), /canonical Shipyard workflow/i);
+
+  writeInstalledFactory(root);
+  const agentsPath = path.join(root, 'AGENTS.md');
+  const quotedContract = fs.readFileSync(agentsPath, 'utf8').replace('## Shipyard', '## Unrelated');
+  fs.writeFileSync(agentsPath, `${quotedContract}\n## Shipyard\n`);
+  assert.throws(() => validateInstalled({ root, ...CONFIG }), /complete Shipyard contract/i);
 });
 
 test('the bundled templates stay identical to their published workflow examples', () => {
@@ -97,6 +105,16 @@ test('the bundled templates stay identical to their published workflow examples'
     const example = fs.readFileSync(new URL(`../examples/workflows/${name}`, import.meta.url), 'utf8');
     assert.equal(template, example);
   }
+});
+
+test('the documented Shipyard contract stays identical to the enforced template', () => {
+  const skill = fs.readFileSync(new URL('../skills/setup-shipyard/SKILL.md', import.meta.url), 'utf8');
+  const documented =
+    /`templates\/AGENTS\.md` is the validator's source of truth\.[\s\S]*?```md\n([\s\S]*?)\n {3}```/.exec(skill)?.[1];
+  const template = fs.readFileSync(new URL('../skills/setup-shipyard/templates/AGENTS.md', import.meta.url), 'utf8');
+
+  assert.ok(documented);
+  assert.equal(documented.replace(/^ {3}/gm, ''), template.trimEnd());
 });
 
 test('the setup validator refuses unknown command options', (t) => {

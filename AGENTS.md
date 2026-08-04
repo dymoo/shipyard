@@ -133,8 +133,8 @@ label with its own dedicated runner label.
   bootstrap. It verifies Matt Pocock's real skills before installing guarded
   workflows and a focused repository-agent contract. Its bundled
   `validate.mjs` checks non-secret setup inputs before edits and accepts only
-  its complete bundled workflow templates after installation; it never
-  substitutes an ad-hoc prompt for a missing Matt workflow.
+  its complete bundled workflow and agent-contract templates after installation;
+  it never substitutes an ad-hoc prompt for a missing Matt workflow.
 - **Shipyard local skill:** `skills/shipyard/SKILL.md` is the portable operating
   integration used after bootstrap. It requires Matt Pocock's real skills and
   must not reproduce their workflows as an ad-hoc prompt.
