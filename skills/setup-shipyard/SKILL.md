@@ -74,17 +74,14 @@ node /path/to/setup-shipyard/validate.mjs --mode preflight --root /path/to/repo 
    - Coder: `examples/workflows/shipyard-coder.yml`, using
      `dymoo/shipyard/cloud-coder@v4`.
 
-   Install the canonical Reviewer and Coder jobs from those examples into
+   Install each complete canonical workflow into its dedicated path:
    `.github/workflows/shipyard-reviewer.yml` and
-   `.github/workflows/shipyard-coder.yml`. If either file exists, audit every
-   reachable job before changing it. Preserve unrelated jobs, steps, actions
-   and permissions unchanged. Replace only an unambiguously identified Shipyard
-   job with the canonical job. If the canonical workflow file cannot be safely
-   partitioned from unrelated jobs or has an unsafe reachable
-   `pull_request_target` path, stop and ask the maintainer to separate the
-   workflows first; never delete unrelated automation. Never retain arbitrary
-   existing steps, actions, permissions, inputs, or
-   checkout/install/build/shell behaviour **inside the Shipyard job**.
+   `.github/workflows/shipyard-coder.yml`. The bundled copies in
+   `templates/` are the validator's source of truth. Do not add jobs, steps,
+   actions, permissions, inputs, checkout/install/build/shell behaviour or
+   comments to either file. If either path already contains shared or modified
+   automation, stop and ask the maintainer to move that automation elsewhere;
+   never merge it into a Shipyard workflow.
 
 2. Replace the example runner label and sandbox-image placeholder with the
    confirmed dedicated label and digest. Do not add checkout, install, build or
@@ -162,10 +159,11 @@ node /path/to/setup-shipyard/validate.mjs --mode preflight --root /path/to/repo 
    removal. Do not manufacture a test Issue or apply `ready-for-agent` merely
    to prove installation.
 5. Run the bundled validator again in `installed` mode with the same values.
-   It checks both workflow files, exact action versions, runner labels, configured
-   secret references, Coder image/readiness, Reviewer no-checkout/no-shell
-   boundary, and the target `AGENTS.md` section. Do not call setup complete
-   unless it passes.
+   It accepts only the two complete bundled templates with the confirmed runner,
+   secret names and Coder image substituted. This proves the action versions,
+   model-Variable wiring, runner labels, permissions, Coder image/readiness,
+   Reviewer no-checkout/no-shell boundary, and the target `AGENTS.md` contract.
+   Do not call setup complete unless it passes.
 
 ## Hand off to normal Shipyard operation
 

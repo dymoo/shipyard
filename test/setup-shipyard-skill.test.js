@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { validateInstalled, validatePreflight } from '../skills/setup-shipyard/validate.mjs';
 
 const CONFIG = {
@@ -15,6 +16,27 @@ const CONFIG = {
   lowComplexityModel: 'provider/low',
   highComplexityModel: 'provider/high',
 };
+
+function configuredWorkflow(name) {
+  return fs
+    .readFileSync(new URL(`../skills/setup-shipyard/templates/${name}`, import.meta.url), 'utf8')
+    .replaceAll('shipyard-runners', CONFIG.runnerLabel)
+    .replaceAll('secrets.LLM_API_KEY', `secrets.${CONFIG.modelSecret}`)
+    .replaceAll('secrets.SHIPYARD_HANDOFF_TOKEN', `secrets.${CONFIG.handoffSecret}`)
+    .replace('ghcr.io/acme/project-ci@sha256:replace-with-a-real-image-digest', CONFIG.sandboxImage);
+}
+
+function writeInstalledFactory(root) {
+  const workflowDirectory = path.join(root, '.github', 'workflows');
+  fs.mkdirSync(workflowDirectory, { recursive: true });
+  fs.writeFileSync(
+    path.join(root, 'AGENTS.md'),
+    `## Shipyard\n\nThe local Codex or Claude Code session owns Matt Pocock planning skills.\nShipyard runs bounded Coder and independent Reviewer work in GitHub Actions; it never auto-merges.\n\nApply \`ready-for-agent\` only to an open GitHub Issue with a complete Agent Brief:\n\nCoder requires a dedicated Docker-capable runner and a digest-pinned test image.\n`,
+  );
+  for (const name of ['shipyard-reviewer.yml', 'shipyard-coder.yml']) {
+    fs.writeFileSync(path.join(workflowDirectory, name), configuredWorkflow(name));
+  }
+}
 
 test('the setup skill requires Matt workflows before configuring Shipyard', () => {
   const skill = fs.readFileSync(new URL('../skills/setup-shipyard/SKILL.md', import.meta.url), 'utf8');
@@ -39,9 +61,8 @@ test('the setup skill installs only explicit, guarded Shipyard contracts', () =>
   assert.match(skill, /replace\s+`secrets\.LLM_API_KEY` and\s+`secrets\.SHIPYARD_HANDOFF_TOKEN`/i);
   assert.match(skill, /same hand-off secret name/i);
   assert.match(skill, /Confirm both\s+Coder and Reviewer use the confirmed dedicated runner\s+label/i);
-  assert.match(skill, /Preserve unrelated jobs, steps, actions\s+and permissions unchanged/i);
-  assert.match(skill, /stop and ask the maintainer to separate the\s+workflows first/i);
-  assert.match(skill, /inside the Shipyard job/i);
+  assert.match(skill, /complete canonical workflow/i);
+  assert.match(skill, /never merge it into a Shipyard workflow/i);
   assert.match(skill, /use `gh secret list` to confirm both\s+names exist/i);
   assert.match(skill, /Clear\s+`SHIPYARD_CODER_READY` before either secret is removed or rotated/i);
   assert.match(skill, /validate\.mjs --mode preflight/);
@@ -57,24 +78,55 @@ test('the setup validator rejects unsafe inputs before workflow edits', (t) => {
   assert.doesNotThrow(() => validatePreflight({ root, ...CONFIG }));
   assert.throws(() => validatePreflight({ root, ...CONFIG, runnerLabel: 'self-hosted' }), /dedicated GitHub label/i);
   assert.throws(() => validatePreflight({ root, ...CONFIG, sandboxImage: 'node:20' }), /SHA-256 digest/i);
+  assert.throws(() => validatePreflight({ root, ...CONFIG, handoffSecret: CONFIG.modelSecret }), /different names/i);
 });
 
 test('the setup validator accepts only a guarded installed factory', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'shipyard-setup-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const workflowDirectory = path.join(root, '.github', 'workflows');
-  fs.mkdirSync(workflowDirectory, { recursive: true });
-  fs.writeFileSync(path.join(root, 'AGENTS.md'), '## Shipyard\n');
-  fs.writeFileSync(
-    path.join(workflowDirectory, 'shipyard-reviewer.yml'),
-    `runs-on: ${CONFIG.runnerLabel}\nuses: dymoo/shipyard@v3\napi-key: \${{ secrets.${CONFIG.modelSecret} }}\nhandoff-token: \${{ secrets.${CONFIG.handoffSecret} }}\nvars.LLM_BASE_URL != ''\nvars.LLM_MODEL != ''\n`,
-  );
-  fs.writeFileSync(
-    path.join(workflowDirectory, 'shipyard-coder.yml'),
-    `runs-on: ${CONFIG.runnerLabel}\nuses: dymoo/shipyard/cloud-coder@v4\napi-key: \${{ secrets.${CONFIG.modelSecret} }}\nhandoff-token: \${{ secrets.${CONFIG.handoffSecret} }}\nvars.SHIPYARD_CODER_READY == 'true'\n${CONFIG.sandboxImage}\n`,
-  );
+  writeInstalledFactory(root);
 
   assert.doesNotThrow(() => validateInstalled({ root, ...CONFIG }));
-  fs.appendFileSync(path.join(workflowDirectory, 'shipyard-reviewer.yml'), '- run: npm test\n');
-  assert.throws(() => validateInstalled({ root, ...CONFIG }), /must not contain shell steps/i);
+  fs.appendFileSync(path.join(root, '.github', 'workflows', 'shipyard-reviewer.yml'), '# uses: dymoo/shipyard@v3\n');
+  assert.throws(() => validateInstalled({ root, ...CONFIG }), /canonical Shipyard workflow/i);
+});
+
+test('the bundled templates stay identical to their published workflow examples', () => {
+  for (const name of ['shipyard-reviewer.yml', 'shipyard-coder.yml']) {
+    const template = fs.readFileSync(new URL(`../skills/setup-shipyard/templates/${name}`, import.meta.url), 'utf8');
+    const example = fs.readFileSync(new URL(`../examples/workflows/${name}`, import.meta.url), 'utf8');
+    assert.equal(template, example);
+  }
+});
+
+test('the setup validator refuses unknown command options', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'shipyard-setup-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const result = spawnSync(process.execPath, [
+    'skills/setup-shipyard/validate.mjs',
+    '--mode',
+    'preflight',
+    '--root',
+    root,
+    '--runner-label',
+    CONFIG.runnerLabel,
+    '--model-secret',
+    CONFIG.modelSecret,
+    '--handoff-secret',
+    CONFIG.handoffSecret,
+    '--sandbox-image',
+    CONFIG.sandboxImage,
+    '--base-url',
+    CONFIG.baseUrl,
+    '--reviewer-model',
+    CONFIG.reviewerModel,
+    '--low-complexity-model',
+    CONFIG.lowComplexityModel,
+    '--high-complexity-model',
+    CONFIG.highComplexityModel,
+    '--runner-lable',
+    CONFIG.runnerLabel,
+  ]);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr.toString(), /documented --key/i);
 });

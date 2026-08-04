@@ -1,9 +1,30 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const SECRET_NAME = /^[A-Z][A-Z0-9_]*$/;
 const RUNNER_LABEL = /^[A-Za-z0-9_.-]+$/;
 const IMAGE_DIGEST = /^[\w./:-]+@sha256:[a-f0-9]{64}$/;
+const SKILL_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
+const OPTIONS = new Set([
+  '--mode',
+  '--root',
+  '--runner-label',
+  '--model-secret',
+  '--handoff-secret',
+  '--sandbox-image',
+  '--base-url',
+  '--reviewer-model',
+  '--low-complexity-model',
+  '--high-complexity-model',
+]);
+const AGENTS_REQUIREMENTS = [
+  '## Shipyard',
+  'The local Codex or Claude Code session owns Matt Pocock planning skills',
+  'Shipyard runs bounded Coder and independent Reviewer work in GitHub Actions; it never auto-merges.',
+  'Apply `ready-for-agent` only to an open GitHub Issue with a complete Agent Brief:',
+  'Coder requires a dedicated Docker-capable runner and a digest-pinned test image.',
+];
 
 export function validatePreflight(config) {
   requiredDirectory(config.root, 'Repository root');
@@ -15,6 +36,9 @@ export function validatePreflight(config) {
     ['Hand-off secret', config.handoffSecret],
   ]) {
     if (!SECRET_NAME.test(value)) throw new Error(`${name} must be a GitHub Actions secret name.`);
+  }
+  if (config.modelSecret === config.handoffSecret) {
+    throw new Error('Model and hand-off secrets must use different names.');
   }
   if (!IMAGE_DIGEST.test(config.sandboxImage)) {
     throw new Error('Sandbox image must be pinned to a lowercase SHA-256 digest.');
@@ -39,47 +63,20 @@ export function validatePreflight(config) {
 
 export function validateInstalled(config) {
   validatePreflight(config);
-  const reviewer = readWorkflow(config.root, 'shipyard-reviewer.yml');
-  const coder = readWorkflow(config.root, 'shipyard-coder.yml');
-
-  requireText(reviewer, `runs-on: ${config.runnerLabel}`, 'Reviewer must use the dedicated runner label.');
-  requireText(coder, `runs-on: ${config.runnerLabel}`, 'Coder must use the dedicated runner label.');
-  requireText(reviewer, 'uses: dymoo/shipyard@v3', 'Reviewer must use the Shipyard v3 action.');
-  requireText(coder, 'uses: dymoo/shipyard/cloud-coder@v4', 'Coder must use the Shipyard v4 action.');
-  requireText(
-    reviewer,
-    `api-key: \${{ secrets.${config.modelSecret} }}`,
-    'Reviewer must use the configured model secret.',
-  );
-  requireText(coder, `api-key: \${{ secrets.${config.modelSecret} }}`, 'Coder must use the configured model secret.');
-  requireText(
-    reviewer,
-    `handoff-token: \${{ secrets.${config.handoffSecret} }}`,
-    'Reviewer must use the configured hand-off secret.',
-  );
-  requireText(
-    coder,
-    `handoff-token: \${{ secrets.${config.handoffSecret} }}`,
-    'Coder must use the configured hand-off secret.',
-  );
-  requireText(reviewer, "vars.LLM_BASE_URL != ''", 'Reviewer must gate on its base URL Variable.');
-  requireText(reviewer, "vars.LLM_MODEL != ''", 'Reviewer must gate on its model Variable.');
-  requireText(coder, "vars.SHIPYARD_CODER_READY == 'true'", 'Coder must gate on explicit readiness.');
-  requireText(coder, config.sandboxImage, 'Coder must use the configured digest-pinned image.');
-  forbidText(reviewer, 'actions/checkout', 'Reviewer must never check out pull-request code.');
-  forbidText(reviewer, /^\s*-\s+run:/m, 'Reviewer must not contain shell steps.');
-  forbidText(`${reviewer}\n${coder}`, 'runs-on: self-hosted', 'Shipyard must not use the broad self-hosted label.');
-
-  const agentsPath = path.join(config.root, 'AGENTS.md');
-  if (!fs.existsSync(agentsPath) || !/^## Shipyard$/m.test(fs.readFileSync(agentsPath, 'utf8'))) {
-    throw new Error('AGENTS.md must contain a Shipyard section.');
-  }
+  validateWorkflow(config, 'shipyard-reviewer.yml');
+  validateWorkflow(config, 'shipyard-coder.yml');
+  validateAgents(config.root);
 }
 
-function readWorkflow(root, name) {
-  const filePath = path.join(root, '.github', 'workflows', name);
+function validateWorkflow(config, name) {
+  const filePath = path.join(config.root, '.github', 'workflows', name);
   if (!fs.existsSync(filePath)) throw new Error(`Missing ${filePath}.`);
-  return fs.readFileSync(filePath, 'utf8');
+  const templatePath = path.join(SKILL_DIRECTORY, 'templates', name);
+  const expected = configuredTemplate(fs.readFileSync(templatePath, 'utf8'), config);
+  const actual = fs.readFileSync(filePath, 'utf8');
+  if (normaliseNewlines(actual) !== normaliseNewlines(expected)) {
+    throw new Error(`${name} must be the canonical Shipyard workflow with only configured substitutions.`);
+  }
 }
 
 function requiredDirectory(value, name) {
@@ -88,12 +85,25 @@ function requiredDirectory(value, name) {
   }
 }
 
-function requireText(text, value, message) {
-  if (!text.includes(value)) throw new Error(message);
+function configuredTemplate(template, config) {
+  return template
+    .replaceAll('shipyard-runners', config.runnerLabel)
+    .replaceAll('secrets.LLM_API_KEY', `secrets.${config.modelSecret}`)
+    .replaceAll('secrets.SHIPYARD_HANDOFF_TOKEN', `secrets.${config.handoffSecret}`)
+    .replace('ghcr.io/acme/project-ci@sha256:replace-with-a-real-image-digest', config.sandboxImage);
 }
 
-function forbidText(text, value, message) {
-  if (typeof value === 'string' ? text.includes(value) : value.test(text)) throw new Error(message);
+function normaliseNewlines(value) {
+  return value.replaceAll('\r\n', '\n');
+}
+
+function validateAgents(root) {
+  const agentsPath = path.join(root, 'AGENTS.md');
+  if (!fs.existsSync(agentsPath)) throw new Error('AGENTS.md must contain the Shipyard contract.');
+  const agents = fs.readFileSync(agentsPath, 'utf8');
+  if (!AGENTS_REQUIREMENTS.every((requirement) => agents.includes(requirement))) {
+    throw new Error('AGENTS.md must contain the complete Shipyard contract.');
+  }
 }
 
 function parseArguments(args) {
@@ -101,7 +111,8 @@ function parseArguments(args) {
   for (let index = 0; index < args.length; index += 2) {
     const key = args[index];
     const value = args[index + 1];
-    if (!key?.startsWith('--') || !value || values[key]) throw new Error('Use each --key value argument exactly once.');
+    if (!OPTIONS.has(key) || !value || values[key])
+      throw new Error('Use each documented --key value argument exactly once.');
     values[key] = value;
   }
   const mode = values['--mode'];
@@ -120,7 +131,7 @@ function parseArguments(args) {
   return { mode, config };
 }
 
-if (process.argv[1] === new URL(import.meta.url).pathname) {
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const { mode, config } = parseArguments(process.argv.slice(2));
   if (mode === 'preflight') validatePreflight(config);
   else validateInstalled(config);
