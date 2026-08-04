@@ -39,7 +39,11 @@ async function main() {
     const workspace = new Workspace(repo.root);
     const model = modelForComplexity(config, brief.complexity);
     const reasoningEffort = reasoningEffortForComplexity(config, brief.complexity);
-    core.info(`Coding Issue #${issue.number} at complexity ${brief.complexity} with ${model} (${reasoningEffort}).`);
+    core.info(
+      `Coding Issue #${issue.number} at complexity ${brief.complexity} with ${model}${
+        reasoningEffort ? ` (${reasoningEffort})` : ''
+      }.`,
+    );
     const llm = new LLM({ ...config, model, reasoningEffort });
     const coding = await runCoder(llm, {
       brief: dispatch.feedback ? `${issue.body}\n\n${dispatch.feedback}` : issue.body,

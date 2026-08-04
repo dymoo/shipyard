@@ -23,11 +23,11 @@ jobs:
       vars.SHIPYARD_CODER_LOW_COMPLEXITY_MODEL != '' &&
       vars.SHIPYARD_CODER_HIGH_COMPLEXITY_MODEL != '' &&
       ((github.event_name == 'issues' &&
-       github.event.action == 'labeled' &&
-       github.event.label.name == 'ready-for-agent' &&
-       github.event.issue.state == 'open' &&
-       !github.event.issue.pull_request) ||
-      (github.event_name == 'repository_dispatch' && github.event.action == 'shipyard-repair'))
+        github.event.action == 'labeled' &&
+        github.event.label.name == 'ready-for-agent' &&
+        github.event.issue.state == 'open' &&
+        !github.event.issue.pull_request) ||
+       (github.event_name == 'repository_dispatch' && github.event.action == 'shipyard-repair'))
     runs-on: shipyard-runners
     timeout-minutes: 45
     steps:
@@ -40,4 +40,4 @@ jobs:
           low-complexity-reasoning-effort: ${{ vars.SHIPYARD_CODER_LOW_COMPLEXITY_REASONING_EFFORT }}
           high-complexity-reasoning-effort: ${{ vars.SHIPYARD_CODER_HIGH_COMPLEXITY_REASONING_EFFORT }}
           handoff-token: ${{ secrets.SHIPYARD_HANDOFF_TOKEN }}
-          sandbox-image: ghcr.io/acme/project-ci@sha256:replace-with-a-real-image-digest
+          sandbox-image: node:20-bookworm-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0

@@ -29,14 +29,53 @@ test('Cloud Coder action declares the bounded implementation contract', () => {
   const action = fs.readFileSync(new URL('../cloud-coder/action.yml', import.meta.url), 'utf8');
   assert.match(action, /^name: Shipyard Cloud Coder$/m);
   assert.match(action, /sandbox-image:/);
-  assert.match(action, /luna-model:/);
-  assert.match(action, /terra-model:/);
-  assert.match(action, /luna-reasoning-effort:/);
-  assert.match(action, /terra-reasoning-effort:/);
+  assert.match(action, /low-complexity-model:/);
+  assert.match(action, /high-complexity-model:/);
+  assert.match(action, /low-complexity-model:\n {4}description:.*\n {4}required: true/);
+  assert.match(action, /high-complexity-model:\n {4}description:.*\n {4}required: true/);
+  assert.match(action, /low-complexity-reasoning-effort:/);
+  assert.match(action, /high-complexity-reasoning-effort:/);
+  assert.doesNotMatch(action, /(?:luna|terra)-(?:model|reasoning-effort)/);
   assert.match(action, /handoff-token:/);
-  assert.match(action, /default: gpt-5\.6-luna/);
-  assert.match(action, /default: gpt-5\.6-terra/);
+  assert.doesNotMatch(action, /gpt-5\.6-(?:luna|terra)/);
   assert.match(action, /main: src\/index\.js/);
+});
+
+test('the Shipyard pilot workflow routes only ready Issues through a pinned Node sandbox', () => {
+  const workflow = fs.readFileSync(new URL('../.github/workflows/shipyard-coder.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /^name: Shipyard Cloud Coder$/m);
+  assert.match(workflow, /github\.event\.label\.name == 'ready-for-agent'/);
+  assert.match(workflow, /github\.event\.issue\.state == 'open'/);
+  assert.match(workflow, /github\.event\.action == 'shipyard-repair'/);
+  assert.match(workflow, /vars\.SHIPYARD_CODER_READY == 'true'/);
+  assert.match(workflow, /low-complexity-model: \$\{\{ vars\.SHIPYARD_CODER_LOW_COMPLEXITY_MODEL \}\}/);
+  assert.match(workflow, /high-complexity-model: \$\{\{ vars\.SHIPYARD_CODER_HIGH_COMPLEXITY_MODEL \}\}/);
+  assert.match(workflow, /runs-on: shipyard-runners/);
+  assert.match(workflow, /sandbox-image: node:20-bookworm-slim@sha256:[a-f0-9]{64}/);
+  assert.match(workflow, /handoff-token: \$\{\{ secrets\.SHIPYARD_HANDOFF_TOKEN \}\}/);
+
+  const example = fs.readFileSync(new URL('../examples/workflows/shipyard-coder.yml', import.meta.url), 'utf8');
+  assert.match(example, /vars\.SHIPYARD_CODER_READY == 'true'/);
+  assert.match(example, /vars\.LLM_BASE_URL != ''/);
+  assert.match(example, /vars\.SHIPYARD_CODER_LOW_COMPLEXITY_MODEL != ''/);
+  assert.match(example, /vars\.SHIPYARD_CODER_HIGH_COMPLEXITY_MODEL != ''/);
+  assert.match(example, /github\.event\.issue\.state == 'open'/);
+});
+
+test('the Shipyard reviewer pilot targets the dedicated ARC scale set', () => {
+  const workflow = fs.readFileSync(new URL('../.github/workflows/shipyard-reviewer.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /^name: Shipyard Cloud Reviewer$/m);
+  assert.match(workflow, /runs-on: shipyard-runners/);
+  assert.match(workflow, /vars\.LLM_BASE_URL != ''/);
+  assert.match(workflow, /vars\.LLM_MODEL != ''/);
+
+  const example = fs.readFileSync(new URL('../examples/workflows/shipyard-reviewer.yml', import.meta.url), 'utf8');
+  assert.match(example, /vars\.LLM_BASE_URL != ''/);
+  assert.match(example, /vars\.LLM_MODEL != ''/);
+
+  const readme = fs.readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  assert.match(readme, /vars\.LLM_BASE_URL != ''/);
+  assert.match(readme, /vars\.LLM_MODEL != ''/);
 });
 
 test('dispatches only when ready-for-agent labels an Issue', (t) => {

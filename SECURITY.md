@@ -12,6 +12,12 @@ or telemetry. The reviewer can contact GitHub's API and its required `base-url`;
 the optional preflight can contact only `https://openrouter.ai/api/v1` and sends
 no repository content.
 
+**Runner boundary.** Cloud Coder and Cloud Reviewer default to a `self-hosted`
+runner. Treat that runner as dedicated trusted infrastructure: it receives model
+and GitHub credentials, must have Docker for the Coder's isolated test
+container, and must not execute unrelated untrusted workloads. The Coder test
+container is an additional boundary, not a substitute for host isolation.
+
 **Credentials.** Model, GitHub and HMAC hand-off keys are masked immediately.
 The reviewer key is sent only to `base-url`; the preflight key only to
 OpenRouter. There is no default or fallback model endpoint. Coder/Reviewer

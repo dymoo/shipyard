@@ -13,7 +13,7 @@ implementation, independent adversarial review, and a hand-off for your final
 merge decision.
 
 **Released now:** Shipyard Cloud Reviewer at `dymoo/shipyard@v3` and Cloud
-Coder at `dymoo/shipyard/cloud-coder@v3`.
+Coder at `dymoo/shipyard/cloud-coder@v4`.
 
 ## The loop
 
@@ -37,6 +37,27 @@ ready-for-human → your local coding tool or you decide to merge
 Shipyard does not have a separate orchestration product. The local coding tool
 remains responsible for planning, queuing, escalation and merge judgement;
 Shipyard is the factory floor inside GitHub Actions.
+
+## Start here: install the local Shipyard skill
+
+Yes, the local skill is required. It is what turns a vague request into the
+small, testable Agent Brief that Cloud Coder can safely execute. It runs in
+your local Codex or Claude Code session; it is **not** loaded into the cloud
+agent.
+
+1. Install Matt Pocock's real skills first: `/triage`, `/wayfinder`,
+   `/to-spec`, `/to-tickets`, `/implement`, `/tdd` and `/code-review`.
+2. In Codex, ask the `skill-installer` to install:
+
+   ```text
+   https://github.com/dymoo/shipyard/tree/main/skills/shipyard
+   ```
+
+3. Use the `shipyard` skill to define a leaf Issue, then apply
+   `ready-for-agent` only after its Agent Brief is complete.
+
+The [local-tool setup guide](docs/shipyard-llm-setup.md) has the full
+installation and operating instructions.
 
 ## Matt's skills are the core dependency
 
@@ -87,21 +108,23 @@ concurrency:
 jobs:
   review:
     if: >-
-      (github.event_name == 'pull_request_target' &&
+      vars.LLM_BASE_URL != '' &&
+      vars.LLM_MODEL != '' &&
+      ((github.event_name == 'pull_request_target' &&
        !startsWith(github.event.pull_request.head.ref, 'shipyard/issue-')) ||
       (github.event_name == 'repository_dispatch' && github.event.action == 'shipyard-review') ||
-      (github.event.issue.pull_request && contains(github.event.comment.body, '@shipyard'))
-    runs-on: ubuntu-latest
+      (github.event.issue.pull_request && contains(github.event.comment.body, '@shipyard')))
+    runs-on: shipyard-runners
     steps:
       - uses: dymoo/shipyard@v3
         with:
-          api-key: ${{ secrets.OPENAI_API_KEY }}
-          base-url: https://api.openai.com/v1
-          model: gpt-5.6-luna
+          api-key: ${{ secrets.LLM_API_KEY }}
+          base-url: ${{ vars.LLM_BASE_URL }}
+          model: ${{ vars.LLM_MODEL }}
           handoff-token: ${{ secrets.SHIPYARD_HANDOFF_TOKEN }}
 ```
 
-Add `OPENAI_API_KEY` and a random `SHIPYARD_HANDOFF_TOKEN` under **Settings →
+Add `LLM_API_KEY` and a random `SHIPYARD_HANDOFF_TOKEN` under **Settings →
 Secrets and variables → Actions**. The reviewer needs an OpenAI-compatible Chat
 Completions endpoint with tool calling. It is API-key-only; a ChatGPT or Codex
 subscription is not a GitHub Actions credential. Coder/Reviewer repository
@@ -136,7 +159,8 @@ Install Shipyard Cloud Reviewer in this repository.
 2. Create .github/workflows/shipyard-reviewer.yml from
    https://github.com/dymoo/shipyard/blob/main/README.md.
 3. Reuse an existing OpenAI-compatible secret name, otherwise use
-   OPENAI_API_KEY. Never put a key in a workflow file.
+   `LLM_API_KEY`. Set `LLM_BASE_URL` and `LLM_MODEL` as repository Variables.
+   Never put a key in a workflow file.
 4. Preserve pull_request_target without checking out, installing, building or
    executing pull-request code in the reviewer job.
 5. Use the real endpoint/model available to the repository. Prefer
@@ -146,19 +170,20 @@ Install Shipyard Cloud Reviewer in this repository.
    Shipyard actions as `handoff-token`. Do not add any secret to a
    `repository_dispatch` payload.
 7. Run the repository's workflow validation, then show the complete diff and
-   identify the secret the maintainer must add.
+   identify the secret and Variables the maintainer must add.
 ```
 
 ## Models
 
-The Cloud Coder default is **GPT-5.6 Luna with `xhigh` reasoning**. It is the
-starting point because the useful unit is cost per _accepted_ PR, not cost per
-raw token. Scores 4–5 route to GPT-5.6 Terra at `high` or `xhigh`; DeepSeek V4
-Flash remains an evaluated cost-sensitive alternative.
+Model choice is repository configuration, never Shipyard action code. The
+Coder requires a low-complexity model for scores 1–3 and a high-complexity
+model for scores 4–5; reasoning effort is optional for each tier and omitted
+when the provider does not support it.
 
-`gpt-5.6-luna` is the API model identifier. `xhigh` is a reasoning-effort
-setting for Cloud Coder's harness, not an input on the seven-input,
-provider-agnostic reviewer.
+Our current recommendation is GPT-5.6 Luna at `xhigh` for scores 1–3 and
+GPT-5.6 Terra at `xhigh` for scores 4–5: the useful unit is cost per
+_accepted_ PR, not cost per raw token. DeepSeek V4 Flash remains an evaluated
+cost-sensitive alternative. These are recommendations, not defaults.
 
 ## Add Shipyard Cloud Coder
 
@@ -172,7 +197,42 @@ to `.github/workflows/shipyard-coder.yml`. It deliberately has no checkout:
 Shipyard downloads the default-branch snapshot itself, and repository code runs
 only inside the sandboxed Docker copy.
 
-Use `dymoo/shipyard/cloud-coder@v3` in the copied workflow. Both actions must
+The maintained examples target ARC's `shipyard-runners` scale-set label. Install
+that as a dedicated, repository-scoped runner with Docker available; it receives
+model and GitHub credentials and must not be shared with untrusted workloads.
+For a non-ARC runner, replace that label with your dedicated runner label. Keep
+ordinary CI on GitHub-hosted runners unless it independently needs your local
+environment.
+
+Set these repository **Variables** before enabling the Coder:
+
+| Variable                                          | Purpose                                            |
+| ------------------------------------------------- | -------------------------------------------------- |
+| `LLM_BASE_URL`                                    | OpenAI-compatible API base URL.                    |
+| `SHIPYARD_CODER_READY`                            | Set to `true` only after both Coder secrets exist. |
+| `SHIPYARD_CODER_LOW_COMPLEXITY_MODEL`             | Model for Agent Brief complexity scores 1–3.       |
+| `SHIPYARD_CODER_HIGH_COMPLEXITY_MODEL`            | Model for Agent Brief complexity scores 4–5.       |
+| `SHIPYARD_CODER_LOW_COMPLEXITY_REASONING_EFFORT`  | Optional effort for scores 1–3.                    |
+| `SHIPYARD_CODER_HIGH_COMPLEXITY_REASONING_EFFORT` | Optional effort for scores 4–5.                    |
+| `LLM_MODEL`                                       | Reviewer model.                                    |
+
+The two model variables are required. Leave either reasoning-effort variable
+empty when its provider does not support that parameter. Set
+`SHIPYARD_CODER_READY` to `true` only after you create both `LLM_API_KEY` and
+`SHIPYARD_HANDOFF_TOKEN`; set it to any other value before removing or rotating
+either secret. This makes the workflow skip before allocating the dedicated
+runner when the factory is not ready.
+
+Cloud Coder v4 has no model defaults or model-branded inputs. Configure the two
+generic tier Variables above; existing v3 installations remain available at
+`cloud-coder@v3`.
+
+This repository's own pilot Agent Briefs use the official digest-pinned Node 20
+image and `npm test`, because that command uses only Node's built-in test
+runner. A consumer whose Agent Brief declares another test command must publish
+an image containing that toolchain and use its immutable digest.
+
+Use `dymoo/shipyard/cloud-coder@v4` in the copied workflow. Both actions must
 receive the same `SHIPYARD_HANDOFF_TOKEN`; Shipyard uses it only to sign and
 verify context-bound HMAC hand-offs, never stores it in the dispatch payload,
 and never exposes it to either model.
@@ -189,10 +249,9 @@ write` because Shipyard's host-side broker creates the branch, draft PR and
 run comment. Its 45-minute job limit is deliberate: the model does not receive
 that token or a shell, but an agentic run must still have an unambiguous end.
 
-By default, complexity scores 1–3 use `gpt-5.6-luna` at `xhigh`; scores 4–5
-use `gpt-5.6-terra` at `xhigh`. The workflow can override the model and
-reasoning-effort inputs only when a provider names or supports them differently;
-routing remains controlled by the Agent Brief complexity score.
+The Coder has no model defaults. It takes its two model tiers and optional
+reasoning efforts from repository Variables; routing remains controlled by the
+Agent Brief complexity score.
 
 ## What Cloud Reviewer guarantees
 

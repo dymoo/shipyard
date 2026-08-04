@@ -69,10 +69,10 @@ export function readConfig() {
     githubToken,
     handoffToken,
     baseUrl: requiredUrl('base-url', requiredInput('base-url')),
-    lunaModel: requiredInput('luna-model'),
-    terraModel: requiredInput('terra-model'),
-    lunaReasoningEffort: requiredInput('luna-reasoning-effort'),
-    terraReasoningEffort: requiredInput('terra-reasoning-effort'),
+    lowComplexityModel: requiredInput('low-complexity-model'),
+    highComplexityModel: requiredInput('high-complexity-model'),
+    lowComplexityReasoningEffort: core.getInput('low-complexity-reasoning-effort'),
+    highComplexityReasoningEffort: core.getInput('high-complexity-reasoning-effort'),
     sandboxImage: requiredInput('sandbox-image'),
     githubApiUrl: requiredUrl('GITHUB_API_URL', requiredEnv('GITHUB_API_URL')),
     ...LIMITS,
@@ -83,14 +83,14 @@ export function modelForComplexity(config, complexity) {
   if (!Number.isInteger(complexity) || complexity < 1 || complexity > 5) {
     throw new Error('Cloud Coder complexity must be an integer from 1 to 5.');
   }
-  return complexity <= 3 ? config.lunaModel : config.terraModel;
+  return complexity <= 3 ? config.lowComplexityModel : config.highComplexityModel;
 }
 
 export function reasoningEffortForComplexity(config, complexity) {
   if (!Number.isInteger(complexity) || complexity < 1 || complexity > 5) {
     throw new Error('Cloud Coder complexity must be an integer from 1 to 5.');
   }
-  return complexity <= 3 ? config.lunaReasoningEffort : config.terraReasoningEffort;
+  return complexity <= 3 ? config.lowComplexityReasoningEffort : config.highComplexityReasoningEffort;
 }
 
 /** Resolve a new ready-for-agent Issue or one bounded reviewer-repair event. */
