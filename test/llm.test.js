@@ -121,6 +121,30 @@ test('OpenRouter requests identify Shipyard without attributing other compatible
   assert.equal(headers[1]['X-OpenRouter-Title'], 'Shipyard');
 });
 
+test('OpenRouter uses the Actions run as a stable prompt-cache session', () => {
+  const llm = new LLM({ ...base, baseUrl: 'https://openrouter.ai/api/v1' }, { env: { GITHUB_RUN_ID: 'review-123' } });
+  assert.equal(llm.buildBody([]).session_id, 'shipyard-review-123');
+  assert.equal(new LLM(base, { env: { GITHUB_RUN_ID: 'review-123' } }).buildBody([]).session_id, undefined);
+});
+
+test('records provider prompt-cache usage separately from total usage', async () => {
+  const llm = new LLM(base, {
+    fetch: async () =>
+      Response.json({
+        choices: [{ message: { content: 'ok' } }],
+        usage: {
+          prompt_tokens: 1000,
+          completion_tokens: 50,
+          prompt_tokens_details: { cached_tokens: 900, cache_write_tokens: 100 },
+        },
+      }),
+  });
+
+  await llm.send([{ role: 'user', content: 'review this' }]);
+
+  assert.deepEqual(llm.usage, { prompt: 1000, completion: 50, cached: 900, cacheWrite: 100, requests: 1 });
+});
+
 test('OpenRouter parameter adaptation never strips the provider privacy policy', async () => {
   const requests = [];
   const llm = new LLM(

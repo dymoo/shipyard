@@ -36,6 +36,7 @@ export class LLM {
       now: runtime.now ?? (() => Date.now()),
       sleep: runtime.sleep ?? core.sleep,
       timeoutSignal: runtime.timeoutSignal ?? ((ms) => AbortSignal.timeout(ms)),
+      env: runtime.env ?? process.env,
     };
     // Identifies this client in findings and in the summary footer.
     this.label = config.label || config.model;
@@ -47,7 +48,7 @@ export class LLM {
       temperature: true,
       reasoningEffort: Boolean(config.reasoningEffort),
     };
-    this.usage = { prompt: 0, completion: 0, requests: 0 };
+    this.usage = { prompt: 0, completion: 0, cached: 0, cacheWrite: 0, requests: 0 };
     // Bumped whenever quirks change, so a request built against older quirks
     // knows to retry rather than adapt a second time for the same reason.
     this.quirksVersion = 0;
@@ -56,7 +57,11 @@ export class LLM {
   buildBody(messages, { tools = null, jsonMode = undefined, schema = null, schemaName = 'response' } = {}) {
     /** @type {Record<string, unknown>} */
     const body = { model: this.config.model, messages };
-    if (this.config.baseUrl === OPENROUTER_BASE_URL) body.provider = OPENROUTER_PROVIDER_POLICY;
+    if (this.config.baseUrl === OPENROUTER_BASE_URL) {
+      body.provider = OPENROUTER_PROVIDER_POLICY;
+      const sessionId = openRouterSessionId(this.runtime.env);
+      if (sessionId) body.session_id = sessionId;
+    }
     if (this.quirks.temperature) body.temperature = this.config.temperature;
     if (this.quirks.reasoningEffort) body.reasoning_effort = this.config.reasoningEffort;
     // response_format and tools do not mix on several gateways; tools win.
@@ -128,6 +133,8 @@ export class LLM {
         this.usage.requests++;
         this.usage.prompt += data?.usage?.prompt_tokens || 0;
         this.usage.completion += data?.usage?.completion_tokens || 0;
+        this.usage.cached += data?.usage?.prompt_tokens_details?.cached_tokens || 0;
+        this.usage.cacheWrite += data?.usage?.prompt_tokens_details?.cache_write_tokens || 0;
         const choice = data?.choices?.[0] || {};
         const message = choice.message || {};
         if (!message.content && !message.reasoning_content && !message.tool_calls?.length) {
@@ -268,6 +275,11 @@ export class LLM {
     if (second === null) core.warning(`Model ${label} still unparseable; treating as empty.`);
     return second;
   }
+}
+
+function openRouterSessionId(env) {
+  const runId = env.GITHUB_RUN_ID?.trim();
+  return runId ? `shipyard-${runId}`.slice(0, 256) : '';
 }
 
 function isRequestAbort(error) {
