@@ -100,6 +100,12 @@ review-and-handoff authority. Both workflows filter repository-dispatch events
 to their Shipyard action before a runner starts; a recognised dispatch without
 its configured HMAC token/proof fails visibly.
 
+Shipyard's own pilot Coder workflow is `.github/workflows/shipyard-coder.yml`.
+It uses `openai/gpt-5.6-luna` at `xhigh`, the shared hand-off secret and the
+digest-pinned Node 20 sandbox image. Its only supported pilot test command is
+`npm test`; a consumer that needs package binaries must publish a test-toolchain
+image and pass that image's immutable digest instead.
+
 ## Agent skills
 
 - **Issue tracker:** GitHub Issues in `dymoo/shipyard`. See
@@ -262,6 +268,9 @@ Keep the diff to one purpose. If it does two things, it is two pull requests.
 - 2026-08-04: Made exact OpenRouter Coder and Reviewer calls use one
   run-scoped sticky prompt-cache session, and exposed provider cache-read/write
   token counts in the review summary without enabling response caching.
+- 2026-08-04: Added Shipyard's first Cloud Coder pilot workflow, using a
+  digest-pinned Node 20 sandbox and the existing `npm test` command; documented
+  local Shipyard-skill installation in the README.
 - 2026-08-04: Bound Coder/Reviewer repository-dispatch hand-offs to HMAC proofs
   over repository, direction, Issue, PR, repair round and head SHA, without storing the
   shared secret in the payload. The receiver also verifies the live PR head.

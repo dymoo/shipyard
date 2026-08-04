@@ -38,6 +38,27 @@ Shipyard does not have a separate orchestration product. The local coding tool
 remains responsible for planning, queuing, escalation and merge judgement;
 Shipyard is the factory floor inside GitHub Actions.
 
+## Start here: install the local Shipyard skill
+
+Yes, the local skill is required. It is what turns a vague request into the
+small, testable Agent Brief that Cloud Coder can safely execute. It runs in
+your local Codex or Claude Code session; it is **not** loaded into the cloud
+agent.
+
+1. Install Matt Pocock's real skills first: `/triage`, `/wayfinder`,
+   `/to-spec`, `/to-tickets`, `/implement`, `/tdd` and `/code-review`.
+2. In Codex, ask the `skill-installer` to install:
+
+   ```text
+   https://github.com/dymoo/shipyard/tree/main/skills/shipyard
+   ```
+
+3. Use the `shipyard` skill to define a leaf Issue, then apply
+   `ready-for-agent` only after its Agent Brief is complete.
+
+The [local-tool setup guide](docs/shipyard-llm-setup.md) has the full
+installation and operating instructions.
+
 ## Matt's skills are the core dependency
 
 Shipyard requires Matt's real workflows rather than a generic “plan then code”
@@ -171,6 +192,11 @@ Copy [the maintained workflow example](examples/workflows/shipyard-coder.yml)
 to `.github/workflows/shipyard-coder.yml`. It deliberately has no checkout:
 Shipyard downloads the default-branch snapshot itself, and repository code runs
 only inside the sandboxed Docker copy.
+
+This repository's own pilot workflow uses the official digest-pinned Node 20
+image and `npm test`, because its test command uses only Node's built-in test
+runner. A consumer whose test command needs package binaries or another runtime
+must publish an image containing that toolchain and use its immutable digest.
 
 Use `dymoo/shipyard/cloud-coder@v3` in the copied workflow. Both actions must
 receive the same `SHIPYARD_HANDOFF_TOKEN`; Shipyard uses it only to sign and
