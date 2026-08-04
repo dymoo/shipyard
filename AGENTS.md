@@ -134,8 +134,9 @@ label with its own dedicated runner label.
   workflows and a focused repository-agent contract. Its bundled
   `validate.mjs` checks non-secret setup inputs before edits, accepts only its
   complete bundled workflow and agent-contract templates after installation,
-  and verifies pre-enable live Variables and secret names through `gh`; it
-  never substitutes an ad-hoc prompt for a missing Matt workflow.
+  and verifies pre-enable live Variables, secret names and the organisation
+  runner-group isolation policy through `gh`; it never substitutes an ad-hoc
+  prompt for a missing Matt workflow.
 - **Shipyard local skill:** `skills/shipyard/SKILL.md` is the portable operating
   integration used after bootstrap. It requires Matt Pocock's real skills and
   must not reproduce their workflows as an ad-hoc prompt.
@@ -285,8 +286,9 @@ Keep the diff to one purpose. If it does two things, it is two pull requests.
   Matt's real workflows before configuring guarded Shipyard Actions and the
   target repository's agent contract, with preflight, exact canonical
   installed-state validation, a live pre-enable `gh` configuration check, a
-  dedicated `shipyard-*` runner label, an origin-remote repository check, and
-  a requirement that omitted optional reasoning-effort Variables are unset.
+  private workflow-restricted organisation runner group, an origin-remote
+  repository check, and a requirement that omitted optional reasoning-effort
+  Variables are unset.
 - 2026-08-04: Added the non-secret `SHIPYARD_CODER_READY` admission gate so a
   missing Coder secret does not allocate a privileged runner.
 - 2026-08-04: Made Cloud Coder model tiers and reasoning effort repository

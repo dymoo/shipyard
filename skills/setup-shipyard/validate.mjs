@@ -8,7 +8,7 @@ const RUNNER_LABEL = /^[A-Za-z0-9_.-]+$/;
 const IMAGE_DIGEST =
   /^(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::\d+)?\/)?[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)*@sha256:[a-f0-9]{64}$/;
 const REPOSITORY = /^[\w.-]+\/[\w.-]+$/;
-const DEDICATED_RUNNER = /^shipyard-[A-Za-z0-9_.-]+$/;
+const RUNNER_GROUP_ID = /^[1-9]\d*$/;
 const GITHUB_HOSTED_RUNNERS = new Set([
   'ubuntu-latest',
   'ubuntu-24.04',
@@ -30,6 +30,7 @@ const OPTIONS = new Set([
   '--root',
   '--repository',
   '--runner-label',
+  '--runner-group-id',
   '--model-secret',
   '--handoff-secret',
   '--sandbox-image',
@@ -49,9 +50,9 @@ export function validatePreflight(config) {
   }
   if (
     !RUNNER_LABEL.test(config.runnerLabel) ||
+    !RUNNER_GROUP_ID.test(config.runnerGroupId) ||
     config.runnerLabel === 'self-hosted' ||
-    GITHUB_HOSTED_RUNNERS.has(config.runnerLabel) ||
-    !DEDICATED_RUNNER.test(config.runnerLabel)
+    GITHUB_HOSTED_RUNNERS.has(config.runnerLabel)
   ) {
     throw new Error('Runner label must be a dedicated GitHub label, never "self-hosted".');
   }
@@ -91,6 +92,7 @@ export function validateInstalled(config) {
   validateWorkflow(config, 'shipyard-coder.yml');
   validateAgents(config.root);
   validateLiveConfiguration(config);
+  validateRunnerGroup(config);
 }
 
 function validateWorkflow(config, name) {
@@ -180,6 +182,40 @@ function validateLiveConfiguration(config) {
   }
 }
 
+function validateRunnerGroup(config) {
+  const [owner] = config.repository.split('/');
+  const group = JSON.parse(runGh(config, ['api', `/orgs/${owner}/actions/runner-groups/${config.runnerGroupId}`]));
+  if (group.visibility !== 'selected' || group.allows_public_repositories || !group.restricted_to_workflows) {
+    throw new Error('Runner group must be selected-repository, private, and restricted to workflows.');
+  }
+  const repositories = runGh(config, [
+    'api',
+    '--paginate',
+    `/orgs/${owner}/actions/runner-groups/${config.runnerGroupId}/repositories`,
+    '--jq',
+    '.repositories[].full_name',
+  ]).split('\n');
+  if (repositories.length !== 1 || repositories[0] !== config.repository) {
+    throw new Error('Runner group must grant access to exactly the target repository.');
+  }
+  const branch = runGh(config, [
+    'repo',
+    'view',
+    config.repository,
+    '--json',
+    'defaultBranchRef',
+    '--jq',
+    '.defaultBranchRef.name',
+  ]);
+  const expectedWorkflows = [
+    `${config.repository}/.github/workflows/shipyard-coder.yml@refs/heads/${branch}`,
+    `${config.repository}/.github/workflows/shipyard-reviewer.yml@refs/heads/${branch}`,
+  ].sort();
+  if (JSON.stringify([...group.selected_workflows].sort()) !== JSON.stringify(expectedWorkflows)) {
+    throw new Error('Runner group must allow exactly the two Shipyard workflows on the default branch.');
+  }
+}
+
 function validateOptionalReasoningEffort(variables, name, expected) {
   if (expected ? variables[name] !== expected : Object.hasOwn(variables, name)) {
     throw new Error(`${name} must ${expected ? 'match the configured value' : 'be unset'}.`);
@@ -225,6 +261,7 @@ function parseArguments(args) {
     root: values['--root'],
     repository: values['--repository'],
     runnerLabel: values['--runner-label'],
+    runnerGroupId: values['--runner-group-id'],
     modelSecret: values['--model-secret'],
     handoffSecret: values['--handoff-secret'],
     sandboxImage: values['--sandbox-image'],

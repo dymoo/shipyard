@@ -9,6 +9,7 @@ import { validateInstalled, validatePreflight } from '../skills/setup-shipyard/v
 const CONFIG = {
   repository: 'dymoo/example',
   runnerLabel: 'shipyard-runners',
+  runnerGroupId: '42',
   modelSecret: 'LLM_API_KEY',
   handoffSecret: 'SHIPYARD_HANDOFF_TOKEN',
   sandboxImage: 'registry.example/ci@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -22,6 +23,21 @@ const CONFIG = {
     return 'git@github.com:dymoo/example.git';
   },
   execute(_file, args) {
+    if (args[0] === 'api' && args[1] === '/orgs/dymoo/actions/runner-groups/42') {
+      return JSON.stringify({
+        visibility: 'selected',
+        allows_public_repositories: false,
+        restricted_to_workflows: true,
+        selected_workflows: [
+          'dymoo/example/.github/workflows/shipyard-coder.yml@refs/heads/main',
+          'dymoo/example/.github/workflows/shipyard-reviewer.yml@refs/heads/main',
+        ],
+      });
+    }
+    if (args[0] === 'api' && args.includes('/orgs/dymoo/actions/runner-groups/42/repositories')) {
+      return 'dymoo/example';
+    }
+    if (args[0] === 'repo' && args[1] === 'view') return 'main';
     if (args[0] === 'variable' && args[1] === 'list') {
       return JSON.stringify(
         Object.entries({
@@ -78,14 +94,14 @@ test('the setup skill installs only explicit, guarded Shipyard contracts', () =>
 
   assert.match(skill, /dymoo\/shipyard@v3/);
   assert.match(skill, /dymoo\/shipyard\/cloud-coder@v4/);
-  assert.match(skill, /never fall back to the\s+broad `self-hosted` label/i);
+  assert.match(skill, /never use the\s+broad `self-hosted` label/i);
   assert.match(skill, /SHA-256 digest-pinned Docker image/i);
   assert.match(skill, /SHIPYARD_CODER_READY=false/);
   assert.match(skill, /Do not enable Coder.*SHIPYARD_CODER_READY=true/is);
   assert.match(skill, /Do not print, write, or request secret values/i);
   assert.match(skill, /replace\s+`secrets\.LLM_API_KEY` and\s+`secrets\.SHIPYARD_HANDOFF_TOKEN`/i);
   assert.match(skill, /same hand-off secret name/i);
-  assert.match(skill, /Confirm both\s+Coder and Reviewer use the confirmed dedicated runner\s+label/i);
+  assert.match(skill, /Coder and Reviewer use the confirmed runner label and its private/i);
   assert.match(skill, /complete canonical workflow/i);
   assert.match(skill, /never merge it into a Shipyard workflow/i);
   assert.match(skill, /use `gh secret list` to confirm both\s+names exist/i);
@@ -104,7 +120,7 @@ test('the setup validator rejects unsafe inputs before workflow edits', (t) => {
   assert.doesNotThrow(() => validatePreflight({ root, ...CONFIG }));
   assert.throws(() => validatePreflight({ root, ...CONFIG, runnerLabel: 'self-hosted' }), /dedicated GitHub label/i);
   assert.throws(() => validatePreflight({ root, ...CONFIG, runnerLabel: 'ubuntu-latest' }), /dedicated GitHub label/i);
-  assert.throws(() => validatePreflight({ root, ...CONFIG, runnerLabel: 'linux' }), /dedicated GitHub label/i);
+  assert.throws(() => validatePreflight({ root, ...CONFIG, runnerGroupId: 'none' }), /dedicated GitHub label/i);
   assert.throws(() => validatePreflight({ root, ...CONFIG, sandboxImage: 'node:20' }), /SHA-256 digest/i);
   assert.throws(
     () =>
@@ -152,6 +168,24 @@ test('the setup validator accepts only a guarded installed factory', (t) => {
     () => validateInstalled({ root, ...CONFIG, lowComplexityReasoningEffort: '', highComplexityReasoningEffort: '' }),
     /SHIPYARD_CODER_LOW_COMPLEXITY_REASONING_EFFORT must be unset/i,
   );
+  assert.throws(
+    () =>
+      validateInstalled({
+        root,
+        ...CONFIG,
+        execute(file, args) {
+          if (args[0] === 'api' && args[1] === '/orgs/dymoo/actions/runner-groups/42') {
+            return JSON.stringify({
+              visibility: 'all',
+              allows_public_repositories: false,
+              restricted_to_workflows: true,
+            });
+          }
+          return CONFIG.execute(file, args);
+        },
+      }),
+    /Runner group must be selected-repository/i,
+  );
 });
 
 test('the bundled templates stay identical to their published workflow examples', () => {
@@ -185,6 +219,8 @@ test('the setup validator refuses unknown command options', (t) => {
     CONFIG.repository,
     '--runner-label',
     CONFIG.runnerLabel,
+    '--runner-group-id',
+    CONFIG.runnerGroupId,
     '--model-secret',
     CONFIG.modelSecret,
     '--handoff-secret',

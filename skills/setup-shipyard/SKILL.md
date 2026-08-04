@@ -38,9 +38,9 @@ Confirm that GitHub Actions is the intended execution platform.
 Collect these values from existing repository configuration or ask the user;
 never invent them:
 
-- a **dedicated** self-hosted runner label with Docker whose name begins
-  `shipyard-`, such as an ARC scale-set release name; never fall back to the
-  broad `self-hosted` label;
+- a self-hosted runner label with Docker, such as an ARC scale-set release
+  name, plus the numeric GitHub **organisation runner-group ID** that owns it;
+  never use the broad `self-hosted` label;
 - the OpenAI-compatible API base URL, reviewer model, low-tier Coder model and
   high-tier Coder model;
 - the optional reasoning effort for each Coder tier;
@@ -60,7 +60,7 @@ repository file changes:
 
 ```text
 node /path/to/setup-shipyard/validate.mjs --mode preflight --root /path/to/repo --repository owner/repo \
-  --runner-label shipyard-runners --model-secret LLM_API_KEY \
+  --runner-label shipyard-runners --runner-group-id 42 --model-secret LLM_API_KEY \
   --handoff-secret SHIPYARD_HANDOFF_TOKEN --sandbox-image registry/image@sha256:<64-lowercase-hex> \
   --base-url https://provider.example/v1 --reviewer-model provider/reviewer \
   --low-complexity-model provider/low --high-complexity-model provider/high
@@ -69,6 +69,11 @@ node /path/to/setup-shipyard/validate.mjs --mode preflight --root /path/to/repo 
 Append `--low-complexity-reasoning-effort` and
 `--high-complexity-reasoning-effort` only when those optional Variables are
 configured. The validator then verifies their live values as well.
+
+This requires `gh` authentication with organisation runner-group read access.
+The installed check accepts a runner group only when it is private to exactly
+this repository and restricted to the two Shipyard workflow paths on the
+repository's default branch. Do not use a shared runner group.
 
 ## Install the factory
 
@@ -155,9 +160,9 @@ configured. The validator then verifies their live values as well.
    repository's normal formatting, lint, type and test checks when they exist.
 2. With `gh`, verify workflow files are present and use `gh secret list` to
    confirm both required secret names immediately before enablement. Confirm both
-   Coder and Reviewer use the confirmed dedicated runner label. Confirm Coder
-   also uses a real digest and the `SHIPYARD_CODER_READY == 'true'` admission
-   condition.
+   Coder and Reviewer use the confirmed runner label and its private,
+   workflow-restricted organisation runner group. Confirm Coder also uses a
+   real digest and the `SHIPYARD_CODER_READY == 'true'` admission condition.
 3. Confirm the reviewer still has no checkout, no execution of pull-request
    code, and no model-controlled write path.
 4. Run the bundled validator again in `installed` mode with the same values.
@@ -166,8 +171,9 @@ configured. The validator then verifies their live values as well.
    model-Variable wiring, runner labels, permissions, Coder image, Reviewer
    no-checkout/no-shell boundary, and the target `AGENTS.md` contract. Using
    `gh`, it also proves the configured Variables are live, Coder admission is
-   still `false`, and the two required secret _names_ exist without reading
-   their values. Do not call setup complete unless it passes.
+   still `false`, the runner group is isolated to the two Shipyard workflows,
+   and the two required secret _names_ exist without reading their values. Do
+   not call setup complete unless it passes.
 5. Only after the validator has passed and the maintainer has confirmed active
    secret values and all configuration is confirmed, set
    `SHIPYARD_CODER_READY=true`. Leave it false when any dependency is pending,
