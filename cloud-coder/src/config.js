@@ -65,11 +65,28 @@ export function readConfig() {
     apiKey,
     githubToken,
     baseUrl: requiredUrl('base-url', requiredInput('base-url')),
-    model: requiredInput('model'),
+    lunaModel: requiredInput('luna-model'),
+    terraModel: requiredInput('terra-model'),
+    lunaReasoningEffort: requiredInput('luna-reasoning-effort'),
+    terraReasoningEffort: requiredInput('terra-reasoning-effort'),
     sandboxImage: requiredInput('sandbox-image'),
     githubApiUrl: requiredUrl('GITHUB_API_URL', requiredEnv('GITHUB_API_URL')),
     ...LIMITS,
   };
+}
+
+export function modelForComplexity(config, complexity) {
+  if (!Number.isInteger(complexity) || complexity < 1 || complexity > 5) {
+    throw new Error('Cloud Coder complexity must be an integer from 1 to 5.');
+  }
+  return complexity <= 3 ? config.lunaModel : config.terraModel;
+}
+
+export function reasoningEffortForComplexity(config, complexity) {
+  if (!Number.isInteger(complexity) || complexity < 1 || complexity > 5) {
+    throw new Error('Cloud Coder complexity must be an integer from 1 to 5.');
+  }
+  return complexity <= 3 ? config.lunaReasoningEffort : config.terraReasoningEffort;
 }
 
 /** Resolve only a ready-for-agent Issue label event. */

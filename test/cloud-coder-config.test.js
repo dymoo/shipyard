@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assertAdmissibleIssue, parseAgentBrief } from '../cloud-coder/src/config.js';
+import {
+  assertAdmissibleIssue,
+  modelForComplexity,
+  parseAgentBrief,
+  reasoningEffortForComplexity,
+} from '../cloud-coder/src/config.js';
 
 const BRIEF = `## Desired behaviour
 Add the missing guard.
@@ -40,4 +45,19 @@ test('accepts only an open ready-for-agent Issue', () => {
   assert.throws(() => assertAdmissibleIssue({ ...issue, state: 'closed' }), /open Issue/i);
   assert.throws(() => assertAdmissibleIssue({ ...issue, labels: [] }), /ready-for-agent/i);
   assert.throws(() => assertAdmissibleIssue({ ...issue, pull_request: {} }), /Issue rather than a pull request/i);
+});
+
+test('routes low and mid complexity to Luna, higher complexity to Terra', () => {
+  const config = {
+    lunaModel: 'luna',
+    terraModel: 'terra',
+    lunaReasoningEffort: 'xhigh',
+    terraReasoningEffort: 'high',
+  };
+  assert.equal(modelForComplexity(config, 1), 'luna');
+  assert.equal(modelForComplexity(config, 3), 'luna');
+  assert.equal(modelForComplexity(config, 4), 'terra');
+  assert.equal(modelForComplexity(config, 5), 'terra');
+  assert.equal(reasoningEffortForComplexity(config, 1), 'xhigh');
+  assert.equal(reasoningEffortForComplexity(config, 5), 'high');
 });

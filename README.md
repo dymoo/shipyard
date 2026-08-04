@@ -171,6 +171,11 @@ write` because Shipyard's host-side broker creates the branch, draft PR and
 run comment. Its 45-minute job limit is deliberate: the model does not receive
 that token or a shell, but an agentic run must still have an unambiguous end.
 
+By default, complexity scores 1–3 use `gpt-5.6-luna` at `xhigh`; scores 4–5
+use `gpt-5.6-terra` at `xhigh`. The workflow can override the model and
+reasoning-effort inputs only when a provider names or supports them differently;
+routing remains controlled by the Agent Brief complexity score.
+
 ## What Cloud Reviewer guarantees
 
 - One investigator, one review pass and a skeptic for each candidate.

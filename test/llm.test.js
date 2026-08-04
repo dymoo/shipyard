@@ -80,6 +80,13 @@ test('request body leaves completion length to the provider and model', () => {
   assert.equal(body.provider, undefined);
 });
 
+test('sends configured reasoning effort and drops it only when the endpoint rejects it', () => {
+  const llm = new LLM({ ...base, reasoningEffort: 'xhigh' });
+  assert.equal(llm.buildBody([]).reasoning_effort, 'xhigh');
+  assert.equal(llm.adapt('reasoning_effort is unsupported'), true);
+  assert.equal('reasoning_effort' in llm.buildBody([]), false);
+});
+
 test('OpenRouter requests deny provider data collection and require ZDR', () => {
   const llm = new LLM({ ...base, baseUrl: 'https://openrouter.ai/api/v1' });
   const expectedPolicy = {

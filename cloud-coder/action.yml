@@ -13,10 +13,22 @@ inputs:
   base-url:
     description: Base URL of the OpenAI-compatible API, including its version path.
     required: true
-  model:
-    description: Model id as the provider names it.
+  luna-model:
+    description: Model for Agent Brief complexity scores 1–3.
     required: false
     default: gpt-5.6-luna
+  terra-model:
+    description: Model for Agent Brief complexity scores 4–5.
+    required: false
+    default: gpt-5.6-terra
+  luna-reasoning-effort:
+    description: Reasoning effort for Luna coding runs.
+    required: false
+    default: xhigh
+  terra-reasoning-effort:
+    description: Reasoning effort for Terra coding runs.
+    required: false
+    default: xhigh
   github-token:
     description: Token used only by Shipyard's host-side GitHub broker.
     required: false

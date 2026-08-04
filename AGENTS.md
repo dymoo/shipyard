@@ -68,8 +68,10 @@ preflight has a separate exact interface: `api-key`, `required-models`, `model`,
 API-key-only. ChatGPT subscription OAuth is deferred in
 `docs/codex-chatgpt-auth.md`.
 
-Cloud Coder's separate public inputs are `api-key`, `base-url`, `model`,
-`github-token` and `sandbox-image`. It triggers only from an `issues` label
+Cloud Coder's separate public inputs are `api-key`, `base-url`, `luna-model`,
+`terra-model`, `luna-reasoning-effort`, `terra-reasoning-effort`,
+`github-token` and `sandbox-image`. Scores 1–3 use Luna and scores 4–5 use
+Terra; both default to `xhigh`. It triggers only from an `issues` label
 event for `ready-for-agent`; it accepts an open Issue rather than a PR. The
 workflow must grant only `contents: write`, `issues: write` and
 `pull-requests: write`, must not check out repository code, and must pass a

@@ -9,7 +9,12 @@ test('Cloud Coder action declares the bounded implementation contract', () => {
   const action = fs.readFileSync(new URL('../cloud-coder/action.yml', import.meta.url), 'utf8');
   assert.match(action, /^name: Shipyard Cloud Coder$/m);
   assert.match(action, /sandbox-image:/);
+  assert.match(action, /luna-model:/);
+  assert.match(action, /terra-model:/);
+  assert.match(action, /luna-reasoning-effort:/);
+  assert.match(action, /terra-reasoning-effort:/);
   assert.match(action, /default: gpt-5\.6-luna/);
+  assert.match(action, /default: gpt-5\.6-terra/);
   assert.match(action, /main: src\/index\.js/);
 });
 

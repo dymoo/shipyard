@@ -41,6 +41,7 @@ export class LLM {
       // ever attempted when a call actually passes a schema.
       jsonSchema: true,
       temperature: true,
+      reasoningEffort: Boolean(config.reasoningEffort),
     };
     this.usage = { prompt: 0, completion: 0, requests: 0 };
     // Bumped whenever quirks change, so a request built against older quirks
@@ -53,6 +54,7 @@ export class LLM {
     const body = { model: this.config.model, messages };
     if (this.config.baseUrl === OPENROUTER_BASE_URL) body.provider = OPENROUTER_PROVIDER_POLICY;
     if (this.quirks.temperature) body.temperature = this.config.temperature;
+    if (this.quirks.reasoningEffort) body.reasoning_effort = this.config.reasoningEffort;
     // response_format and tools do not mix on several gateways; tools win.
     const wantJson = jsonMode === undefined ? this.quirks.jsonMode : jsonMode && this.quirks.jsonMode;
     if (wantJson && !tools) {
@@ -199,6 +201,11 @@ export class LLM {
     if (this.quirks.temperature && /temperature/i.test(t)) {
       core.warning('Endpoint rejected temperature — retrying without it.');
       this.quirks.temperature = false;
+      return true;
+    }
+    if (this.quirks.reasoningEffort && /reasoning[_ ]?effort/i.test(t)) {
+      core.warning('Endpoint rejected reasoning_effort — retrying without it.');
+      this.quirks.reasoningEffort = false;
       return true;
     }
     // Some gateways reject json mode without naming it. Try once without.

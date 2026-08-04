@@ -4,7 +4,14 @@ import { LLM } from '../../src/llm.js';
 import { openArchiveRepo } from '../../src/repo.js';
 import { runCoder } from './agent.js';
 import { branchForIssue, createDraftPull, deleteBranch, publishChanges } from './broker.js';
-import { assertAdmissibleIssue, parseAgentBrief, readConfig, readIssueEvent } from './config.js';
+import {
+  assertAdmissibleIssue,
+  modelForComplexity,
+  parseAgentBrief,
+  readConfig,
+  readIssueEvent,
+  reasoningEffortForComplexity,
+} from './config.js';
 import { runSandbox } from './sandbox.js';
 import { Workspace } from './workspace.js';
 
@@ -38,7 +45,10 @@ async function main() {
   try {
     if (!repo.root) throw new Error('Cloud Coder requires an extracted repository workspace.');
     const workspace = new Workspace(repo.root);
-    const llm = new LLM(config);
+    const model = modelForComplexity(config, brief.complexity);
+    const reasoningEffort = reasoningEffortForComplexity(config, brief.complexity);
+    core.info(`Coding Issue #${issue.number} at complexity ${brief.complexity} with ${model} (${reasoningEffort}).`);
+    const llm = new LLM({ ...config, model, reasoningEffort });
     const coding = await runCoder(llm, {
       brief: issue.body,
       workspace,
