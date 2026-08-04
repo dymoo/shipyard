@@ -1,6 +1,6 @@
-# commitreview reviewing commitreview. It uses the last released major rather
+# Shipyard Cloud Reviewer reviewing itself. It uses the last released major rather
 # than executing code from the pull request under review.
-name: commitreview
+name: Shipyard Cloud Reviewer
 
 on:
   pull_request_target:
@@ -13,7 +13,7 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: commitreview-${{ github.event.pull_request.number || github.event.issue.number }}
+  group: shipyard-review-${{ github.event.pull_request.number || github.event.issue.number }}
   cancel-in-progress: true
 
 jobs:
@@ -22,10 +22,10 @@ jobs:
       vars.LLM_BASE_URL != '' &&
       vars.LLM_MODEL != '' &&
       (github.event_name == 'pull_request_target' ||
-       (github.event.issue.pull_request && contains(github.event.comment.body, '@commitreview')))
+       (github.event.issue.pull_request && contains(github.event.comment.body, '@shipyard')))
     runs-on: ubuntu-latest
     steps:
-      - uses: dymoo/commitreview@v2
+      - uses: dymoo/shipyard@v3
         with:
           api-key: ${{ secrets.LLM_API_KEY }}
           base-url: ${{ vars.LLM_BASE_URL }}

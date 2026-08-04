@@ -3,9 +3,9 @@
  *
  * "OpenAI-compatible" is a spectrum: OpenRouter, Ollama, vLLM, Together, Groq
  * and friends all serve /chat/completions but disagree about response_format,
- * temperature and max_tokens. So the client probes: on a 400 naming a parameter
- * it can live without, it drops or renames that parameter and retries, then
- * remembers for the rest of the run.
+ * temperature. So the client probes: on a 400 naming a parameter it can live
+ * without, it drops that parameter and retries, then remembers for the rest of
+ * the run. Completion length is deliberately left to the provider and model.
  *
  * Structured output is used when offered but never assumed. A call that passes a
  * `schema` asks for it three ways, strongest first: `json_schema` (the model is
@@ -41,7 +41,6 @@ export class LLM {
       // ever attempted when a call actually passes a schema.
       jsonSchema: true,
       temperature: true,
-      maxTokensKey: 'max_tokens',
     };
     this.usage = { prompt: 0, completion: 0, requests: 0 };
     // Bumped whenever quirks change, so a request built against older quirks
@@ -54,7 +53,6 @@ export class LLM {
     const body = { model: this.config.model, messages };
     if (this.config.baseUrl === OPENROUTER_BASE_URL) body.provider = OPENROUTER_PROVIDER_POLICY;
     if (this.quirks.temperature) body.temperature = this.config.temperature;
-    if (this.quirks.maxTokensKey) body[this.quirks.maxTokensKey] = this.config.maxOutputTokens;
     // response_format and tools do not mix on several gateways; tools win.
     const wantJson = jsonMode === undefined ? this.quirks.jsonMode : jsonMode && this.quirks.jsonMode;
     if (wantJson && !tools) {
@@ -100,7 +98,7 @@ export class LLM {
           headers: {
             authorization: `Bearer ${this.config.apiKey}`,
             'content-type': 'application/json',
-            'user-agent': 'commitreview',
+            'user-agent': 'shipyard',
           },
           body: JSON.stringify(body),
           signal: this.runtime.timeoutSignal(remainingMs),
@@ -147,7 +145,7 @@ export class LLM {
       if (body.tools && /\btools?\b|tool_choice|function[_ ]call|function calling/i.test(text)) {
         const e = /** @type {Error & {toolsUnsupported?: boolean}} */ (
           new Error(
-            `This endpoint rejected tool calling, which commitreview requires (${res.status}). ` +
+            `This endpoint rejected tool calling, which Shipyard requires (${res.status}). ` +
               `Use a model and endpoint that support OpenAI-style function calling. ${truncate(text, 200)}`,
           )
         );
@@ -196,15 +194,6 @@ export class LLM {
     if (this.quirks.jsonMode && /response_format|json_object|json_schema/i.test(t)) {
       core.warning('Endpoint rejected response_format — falling back to prompt-only JSON.');
       this.quirks.jsonMode = false;
-      return true;
-    }
-    if (this.quirks.maxTokensKey === 'max_tokens' && /max_completion_tokens|max_tokens/i.test(t)) {
-      core.warning('Endpoint rejected max_tokens — retrying with max_completion_tokens.');
-      this.quirks.maxTokensKey = 'max_completion_tokens';
-      return true;
-    }
-    if (this.quirks.maxTokensKey === 'max_completion_tokens' && /max_completion_tokens/i.test(t)) {
-      this.quirks.maxTokensKey = null;
       return true;
     }
     if (this.quirks.temperature && /temperature/i.test(t)) {

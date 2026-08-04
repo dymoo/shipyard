@@ -1,7 +1,7 @@
 import * as core from './core.js';
 import { isSafeRepoPath } from './repo.js';
 
-const USER_AGENT = 'commitreview';
+const USER_AGENT = 'shipyard';
 
 export class HttpError extends Error {
   constructor(status, message) {

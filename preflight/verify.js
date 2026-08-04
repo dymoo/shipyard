@@ -62,7 +62,7 @@ export async function verifyOpenRouterPreflight(config, runtime = {}) {
   const headers = {
     authorization: `Bearer ${config.apiKey}`,
     'content-type': 'application/json',
-    'user-agent': 'commitreview-openrouter-preflight',
+    'user-agent': 'shipyard-openrouter-preflight',
     'x-openrouter-metadata': 'enabled',
   };
 
@@ -143,7 +143,6 @@ function requestBody(model, providerOverrides = {}) {
     model,
     messages: SYNTHETIC_MESSAGES,
     temperature: 0.1,
-    max_tokens: 512,
     tools: [TOOL],
     tool_choice: { type: 'function', function: { name: 'read_file' } },
     usage: { include: true },

@@ -7,7 +7,6 @@ const base = {
   baseUrl: 'https://example.invalid/v1',
   apiKey: 'k',
   temperature: 0.1,
-  maxOutputTokens: 100,
   requestTimeoutMs: 1000,
 };
 
@@ -70,12 +69,13 @@ test('returns null when there is no JSON at all', () => {
   assert.equal(extractJson(''), null);
 });
 
-test('request body carries the tunables the endpoint is expected to support', () => {
+test('request body leaves completion length to the provider and model', () => {
   const llm = new LLM(base);
   const body = llm.buildBody([{ role: 'user', content: 'hi' }]);
   assert.equal(body.model, 'test-model');
   assert.equal(body.temperature, 0.1);
-  assert.equal(body.max_tokens, 100);
+  assert.equal(body.max_tokens, undefined);
+  assert.equal(body.max_completion_tokens, undefined);
   assert.deepEqual(body.response_format, { type: 'json_object' });
   assert.equal(body.provider, undefined);
 });
@@ -270,14 +270,6 @@ test('an endpoint that rejects tool calling is a hard error, not a degrade', asy
   }
 });
 
-test('renames max_tokens when the endpoint demands max_completion_tokens', () => {
-  const llm = new LLM(base);
-  llm.quirks.jsonMode = false;
-  assert.equal(llm.adapt("Use 'max_completion_tokens' instead of 'max_tokens'"), true);
-  assert.equal(llm.buildBody([]).max_completion_tokens, 100);
-  assert.equal(llm.buildBody([]).max_tokens, undefined);
-});
-
 test('drops temperature when the model only supports the default', () => {
   const llm = new LLM(base);
   llm.quirks.jsonMode = false;
@@ -300,6 +292,5 @@ test('adaptation eventually gives up instead of looping', () => {
   const llm = new LLM(base);
   llm.quirks.jsonMode = false;
   llm.quirks.temperature = false;
-  llm.quirks.maxTokensKey = null;
   assert.equal(llm.adapt('some unrelated failure'), false);
 });

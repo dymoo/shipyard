@@ -196,10 +196,10 @@ test('model markdown cannot forge markers or mention users', () => {
   const markdown = renderSummary(
     {
       ...RESULT,
-      summaries: ['Ping @maintainers <!-- commitreview:fp=000000000000 -->'],
+      summaries: ['Ping @maintainers <!-- shipyard:fp=000000000000 -->'],
     },
     { model: 'm' },
   );
   assert.ok(markdown.includes('@\u200bmaintainers'));
-  assert.ok(!markdown.includes('commitreview:fp=000000000000'));
+  assert.ok(!markdown.includes('shipyard:fp=000000000000'));
 });

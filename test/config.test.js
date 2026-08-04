@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { readConfig, readEvent, containsPhrase, extractFocus } from '../src/config.js';
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'commitreview-event-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'shipyard-event-'));
 
 function withEnv(values, fn) {
   const saved = { ...process.env };
@@ -34,7 +34,7 @@ const comment = (overrides = {}) => ({
   issue: { number: 7, pull_request: {} },
   comment: {
     id: 99,
-    body: '@commitreview focus on auth',
+    body: '@shipyard focus on auth',
     author_association: 'OWNER',
     user: { type: 'User' },
   },
@@ -68,10 +68,10 @@ test('pull request events run and unrelated events skip', () => {
 });
 
 test('trigger matching has a boundary and focus is bounded', () => {
-  assert.ok(containsPhrase('hey @COMMITREVIEW please look'));
-  assert.ok(!containsPhrase('@commitreviewer go'));
-  assert.equal(extractFocus('@commitreview check the migration'), 'check the migration');
-  assert.equal(extractFocus('@commitreview'), '');
+  assert.ok(containsPhrase('hey @SHIPYARD please look'));
+  assert.ok(!containsPhrase('@shipyarder go'));
+  assert.equal(extractFocus('@shipyard check the migration'), 'check the migration');
+  assert.equal(extractFocus('@shipyard'), '');
 });
 
 test('configuration has six public inputs and no URL fallback', () => {

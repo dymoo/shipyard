@@ -4,7 +4,7 @@ import * as core from './core.js';
 export const SEVERITIES = ['critical', 'high', 'medium', 'low'];
 export const VERDICT_REAL = 'real';
 export const VERDICT_NOT_REAL = 'not_real';
-export const BOT_SIGNATURE = '<!-- commitreview:bot -->';
+export const BOT_SIGNATURE = '<!-- shipyard:bot -->';
 
 /** Lower rank is more severe. */
 export const severityRank = (severity) => {
@@ -44,7 +44,7 @@ export const DEFAULT_IGNORES = [
   '**/*.svg',
 ];
 
-const TRIGGER_PHRASE = '@commitreview';
+const TRIGGER_PHRASE = '@shipyard';
 const ALLOWED_ASSOCIATIONS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
 
 /**
@@ -63,7 +63,6 @@ const LIMITS = {
   maxFindings: 25,
   minSeverity: 'low',
   temperature: 0.1,
-  maxOutputTokens: 16000,
   requestTimeoutMs: 600000,
 };
 
@@ -172,7 +171,7 @@ export function readEvent() {
   return { ...base, skip: `unsupported event "${eventName}"` };
 }
 
-/** Word-boundary-ish match so "@commitreviewer" does not trigger a review. */
+/** Word-boundary-ish match so "@shipyarder" does not trigger a review. */
 export function containsPhrase(body, phrase = TRIGGER_PHRASE) {
   const index = body.toLowerCase().indexOf(phrase.toLowerCase());
   if (index === -1) return false;

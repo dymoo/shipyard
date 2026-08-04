@@ -1,9 +1,9 @@
 # Recommended setup: review every push to a pull request, and re-review on demand
-# when someone comments @commitreview.
+# when someone comments @shipyard.
 #
-# pull_request_target is safe here because commitreview never checks out or runs
+# pull_request_target is safe here because Shipyard never checks out or runs
 # the pull request's code. Do not add actions/checkout of the head ref below.
-name: commitreview
+name: Shipyard Cloud Reviewer
 
 on:
   pull_request_target:
@@ -16,18 +16,18 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: commitreview-${{ github.event.pull_request.number || github.event.issue.number }}
+  group: shipyard-review-${{ github.event.pull_request.number || github.event.issue.number }}
   cancel-in-progress: true
 
 jobs:
   review:
     if: >-
       github.event_name == 'pull_request_target' ||
-      (github.event.issue.pull_request && contains(github.event.comment.body, '@commitreview'))
+      (github.event.issue.pull_request && contains(github.event.comment.body, '@shipyard'))
     runs-on: ubuntu-latest
     steps:
-      - uses: dymoo/commitreview@v2
+      - uses: dymoo/shipyard@v3
         with:
-          api-key: ${{ secrets.LLM_API_KEY }}
-          base-url: https://openrouter.ai/api/v1
-          model: your-provider/model-id
+          api-key: ${{ secrets.OPENAI_API_KEY }}
+          base-url: https://api.openai.com/v1
+          model: gpt-5.6-luna

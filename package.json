@@ -1,7 +1,7 @@
 {
-  "name": "commitreview",
-  "version": "2.0.2",
-  "description": "Bring-your-own-key AI code review as a GitHub Action. Works with any OpenAI-compatible endpoint.",
+  "name": "shipyard",
+  "version": "3.0.0",
+  "description": "GitHub-first code factory with adversarial AI code review.",
   "type": "module",
   "private": true,
   "license": "MIT",

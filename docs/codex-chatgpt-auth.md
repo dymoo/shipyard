@@ -1,6 +1,6 @@
 # ChatGPT subscription authentication
 
-> **Status: deferred.** commitreview v2 accepts API keys only.
+> **Status: deferred.** Shipyard Cloud Reviewer accepts API keys only.
 
 The earlier design proposed copying the Codex device-login flow and calling
 ChatGPT's internal Codex Responses endpoint directly. We are not shipping that

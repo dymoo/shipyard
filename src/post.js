@@ -4,9 +4,9 @@
 import * as core from './core.js';
 import { severityRank, BOT_SIGNATURE } from './config.js';
 
-export const SUMMARY_MARKER = '<!-- commitreview:summary -->';
+export const SUMMARY_MARKER = '<!-- shipyard:summary -->';
 const MAX_NOT_REVIEWED = 10;
-const RESERVED_MARKER = /<!--\s*commitreview:[\s\S]*?-->/gi;
+const RESERVED_MARKER = /<!--\s*shipyard:[\s\S]*?-->/gi;
 
 const SEVERITY_ICON = {
   critical: '🛑',
@@ -28,14 +28,14 @@ export function commentBody(finding, anchor) {
     parts.push('', `<sub>Anchored to the nearest changed line; the model referenced line ${finding.line}.</sub>`);
   }
   if (finding.refutation) parts.push('', `<sub>Verifier: ${escapeHtml(finding.refutation)}</sub>`);
-  parts.push('', '<sub>commitreview</sub>', `<!-- commitreview:fp=${finding.fp} -->`);
+  parts.push('', '<sub>Shipyard Cloud Reviewer</sub>', `<!-- shipyard:fp=${finding.fp} -->`);
   return parts.join('\n');
 }
 
 export function renderSummary(result, config) {
   const { pr, anchored, demoted, duplicates, skipped, dropped, summaries, refuted, usage, reviewedFiles } = result;
   const all = [...anchored, ...demoted];
-  const out = [SUMMARY_MARKER, '', '## commitreview'];
+  const out = [SUMMARY_MARKER, '', '## Shipyard Cloud Reviewer'];
 
   const blurb = safeModelMarkdown(summaries.filter(Boolean).join('\n\n'), 5000);
   if (blurb) out.push('', blurb);
@@ -74,7 +74,7 @@ export function renderSummary(result, config) {
       '',
       ...demoted.map(
         (finding) =>
-          `- **${finding.severity}** \`${displayPath(finding.path)}\`${finding.line ? `:${finding.line}` : ''} — ${escapeInline(finding.title)}\n  ${oneLine(safeModelMarkdown(finding.body, 4000))}\n  <!-- commitreview:fp=${finding.fp} -->`,
+          `- **${finding.severity}** \`${displayPath(finding.path)}\`${finding.line ? `:${finding.line}` : ''} — ${escapeInline(finding.title)}\n  ${oneLine(safeModelMarkdown(finding.body, 4000))}\n  <!-- shipyard:fp=${finding.fp} -->`,
       ),
       '',
       '</details>',
@@ -107,7 +107,7 @@ export function renderSummary(result, config) {
     duplicates ? `${duplicates} already reported` : null,
     pr?.head?.sha ? `\`${pr.head.sha.slice(0, 7)}\`` : null,
   ].filter(Boolean);
-  out.push('', `<sub>${footer.join(' · ')} · <a href="https://github.com/dymoo/commitreview">commitreview</a></sub>`);
+  out.push('', `<sub>${footer.join(' · ')} · <a href="https://github.com/dymoo/shipyard">Shipyard</a></sub>`);
 
   return out.join('\n');
 }
@@ -132,7 +132,7 @@ export async function postInline(gh, ctx, pr, comments) {
     await gh.createReview(ctx.owner, ctx.repo, ctx.prNumber, {
       commit_id: pr.head.sha,
       event: 'COMMENT',
-      body: `**commitreview** left ${comments.length} comment${comments.length === 1 ? '' : 's'}.\n${BOT_SIGNATURE}`,
+      body: `**Shipyard Cloud Reviewer** left ${comments.length} comment${comments.length === 1 ? '' : 's'}.\n${BOT_SIGNATURE}`,
       comments,
     });
     return comments.length;

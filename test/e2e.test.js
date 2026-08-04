@@ -43,7 +43,7 @@ const FINDINGS = {
 };
 
 function makeTarball(files, symlinks = {}) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'commitreview-src-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'shipyard-src-'));
   const top = 'o-r-headsha';
   for (const [relative, content] of Object.entries(files)) {
     const full = path.join(dir, top, relative);
@@ -208,7 +208,7 @@ async function stubServer({
 
 async function runAction(port, extra = {}) {
   const { __event, ...envOverrides } = extra;
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'commitreview-run-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'shipyard-run-'));
   const eventPath = path.join(tmp, 'event.json');
   fs.writeFileSync(eventPath, JSON.stringify(__event || { pull_request: { number: 1 } }));
   const outputPath = path.join(tmp, 'output.txt');
@@ -284,7 +284,7 @@ test('reviews, verifies, anchors and posts the v2 output contract', async (t) =>
   assert.match(captured.reviews[0].comments[0].body, /Returns null instead of a 404/);
 
   const summary = captured.createdComments[0].body;
-  assert.match(summary, /<!-- commitreview:summary -->/);
+  assert.match(summary, /<!-- shipyard:summary -->/);
   assert.match(summary, /\*\*2 findings\*\*/);
   assert.match(summary, /could not be anchored/);
 
@@ -318,7 +318,7 @@ test('a focused mention always reviews instead of being misclassified as chat', 
     __event: {
       issue: { number: 1, pull_request: {} },
       comment: {
-        body: '@commitreview is the retry backoff correct?',
+        body: '@shipyard is the retry backoff correct?',
         author_association: 'OWNER',
         user: { login: 'alice', type: 'User' },
       },
@@ -377,7 +377,7 @@ test('an endpoint without tool calling fails instead of degrading', async (t) =>
 
 test('the summary is updated in place when one already exists', async (t) => {
   const { server, captured, port } = await stubServer({
-    issueComments: [{ id: 20, body: '<!-- commitreview:summary -->\nold' }],
+    issueComments: [{ id: 20, body: '<!-- shipyard:summary -->\nold' }],
   });
   t.after(() => server.close());
 
@@ -389,7 +389,7 @@ test('the summary is updated in place when one already exists', async (t) => {
 });
 
 test('a pull request symlink cannot read outside the extracted repository', async (t) => {
-  const outside = path.join(os.tmpdir(), `commitreview-secret-${process.pid}.txt`);
+  const outside = path.join(os.tmpdir(), `shipyard-secret-${process.pid}.txt`);
   fs.writeFileSync(outside, 'API_KEY=super-secret-value');
   t.after(() => fs.rmSync(outside, { force: true }));
 
@@ -485,11 +485,11 @@ test('already-reported findings remain visible without being posted again', asyn
   const anchoredFp = fingerprint(FINDINGS.findings[0], '  if (!user) return null;');
   const demotedFp = fingerprint(FINDINGS.findings[1], '');
   const { server, captured, port } = await stubServer({
-    reviewComments: [{ body: `<!-- commitreview:fp=${anchoredFp} -->` }],
+    reviewComments: [{ body: `<!-- shipyard:fp=${anchoredFp} -->` }],
     issueComments: [
       {
         id: 20,
-        body: `<!-- commitreview:summary -->\n<!-- commitreview:fp=${demotedFp} -->`,
+        body: `<!-- shipyard:summary -->\n<!-- shipyard:fp=${demotedFp} -->`,
       },
     ],
   });
@@ -501,5 +501,5 @@ test('already-reported findings remain visible without being posted again', asyn
   assert.equal(captured.updatedComments.length, 1);
   assert.match(captured.updatedComments[0].body, /\*\*2 findings\*\*/);
   assert.match(captured.updatedComments[0].body, /2 already reported/);
-  assert.match(captured.updatedComments[0].body, new RegExp(`commitreview:fp=${demotedFp}`));
+  assert.match(captured.updatedComments[0].body, new RegExp(`shipyard:fp=${demotedFp}`));
 });

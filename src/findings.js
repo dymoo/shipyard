@@ -86,7 +86,7 @@ export function fingerprint(finding, codeLine) {
   return createHash('sha256').update(`${finding.path}|${title}|${code}`).digest('hex').slice(0, 12);
 }
 
-const FP_MARKER = /<!--\s*commitreview:fp=([0-9a-f]{12})\s*-->/g;
+const FP_MARKER = /<!--\s*shipyard:fp=([0-9a-f]{12})\s*-->/g;
 
 export function collectFingerprints(bodies) {
   const seen = new Set();

@@ -59,7 +59,7 @@ export function openRepoViaApi(gh, { owner, repo, sha }) {
 }
 
 async function tarballRepo(gh, owner, repo, sha) {
-  const dir = await fsp.mkdtemp(path.join(tmpdir(), 'commitreview-'));
+  const dir = await fsp.mkdtemp(path.join(tmpdir(), 'shipyard-'));
   const archive = path.join(dir, 'repo.tar.gz');
 
   try {

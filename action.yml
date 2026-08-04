@@ -1,6 +1,6 @@
-name: commitreview
-description: Context-aware AI code review on pull requests. Bring your own OpenAI-compatible endpoint.
-author: commitreview contributors
+name: Shipyard Cloud Reviewer
+description: Read-only, adversarial AI code review for Shipyard draft pull requests.
+author: Shipyard contributors
 
 branding:
   icon: git-pull-request

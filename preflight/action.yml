@@ -1,6 +1,6 @@
-name: OpenRouter privacy preflight
+name: Shipyard OpenRouter Preflight
 description: Prove an OpenRouter key and source-free model route before sending repository content.
-author: commitreview contributors
+author: Shipyard contributors
 
 branding:
   icon: shield
