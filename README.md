@@ -14,8 +14,8 @@ merge decision.
 
 **Released now:** Shipyard Cloud Reviewer at `dymoo/shipyard@v3`.
 
-**Being built here:** Shipyard Cloud Coder. Do not add a fictional coder
-workflow before that action is released.
+**In development:** Shipyard Cloud Coder. Its workflow is intentionally shown
+with `<released-version>` until the action is released.
 
 ## The loop
 
@@ -72,19 +72,26 @@ on:
     types: [opened, synchronize, reopened]
   issue_comment:
     types: [created]
+  repository_dispatch:
+    types: [shipyard-review]
 
 permissions:
-  contents: read
+  # The fixed Coder repair hand-off needs repository_dispatch. This token is
+  # never exposed to the Cloud Reviewer model.
+  contents: write
+  issues: write
   pull-requests: write
 
 concurrency:
-  group: shipyard-review-${{ github.event.pull_request.number || github.event.issue.number }}
+  group: shipyard-review-${{ github.event.pull_request.number || github.event.issue.number || github.event.client_payload.pull_request }}
   cancel-in-progress: true
 
 jobs:
   review:
     if: >-
-      github.event_name == 'pull_request_target' ||
+      (github.event_name == 'pull_request_target' &&
+       !startsWith(github.event.pull_request.head.ref, 'shipyard/issue-')) ||
+      github.event_name == 'repository_dispatch' ||
       (github.event.issue.pull_request && contains(github.event.comment.body, '@shipyard'))
     runs-on: ubuntu-latest
     steps:
@@ -103,6 +110,11 @@ credential.
 The workflow intentionally has **no checkout**. `pull_request_target` remains
 safe only because Cloud Reviewer reads the pull-request snapshot and never
 executes its code. Do not add a head-ref checkout, install, build or shell step.
+The action's host code uses its GitHub token only for its fixed, non-model-led
+handoff: request one Coder repair or mark the Coder's draft PR ready for review.
+It skips ordinary pull-request events for generated `shipyard/issue-*` branches:
+the repository-dispatch run is the single review-and-handoff authority for those
+drafts.
 
 An owner, member or collaborator can request focused guidance with:
 
@@ -143,6 +155,39 @@ Flash remains an evaluated cost-sensitive alternative.
 `gpt-5.6-luna` is the API model identifier. `xhigh` is a reasoning-effort
 setting for Cloud Coder's future harness, not an input on this six-input,
 provider-agnostic reviewer.
+
+## Add Shipyard Cloud Coder
+
+Cloud Coder is triggered by an **Issue**, not by a pull request. Your local
+Codex or Claude Code session must use the Shipyard/Matt Pocock workflow to make
+the Issue exceptionally clear, place the Agent Brief in its body, then add
+`ready-for-agent`.
+
+Copy [the maintained workflow example](examples/workflows/shipyard-coder.yml)
+to `.github/workflows/shipyard-coder.yml`. It deliberately has no checkout:
+Shipyard downloads the default-branch snapshot itself, and repository code runs
+only inside the sandboxed Docker copy.
+
+Cloud Coder is still a development preview in this branch. Do not enable the
+template until the first Coder release is tagged; replace `<released-version>`
+with that immutable release reference when it is published.
+
+Before enabling it, replace the example `sandbox-image` with an image pinned to
+an actual SHA-256 digest. That image must already contain the repository's test
+toolchain because the test container has no network. The Coder reads the Brief,
+creates `shipyard/issue-<number>`, writes one non-force commit, opens a draft
+PR, dispatches Cloud Reviewer in its separate workflow, and comments back on
+the source Issue. It never auto-merges.
+
+The workflow needs `contents: write`, `issues: write` and `pull-requests:
+write` because Shipyard's host-side broker creates the branch, draft PR and
+run comment. Its 45-minute job limit is deliberate: the model does not receive
+that token or a shell, but an agentic run must still have an unambiguous end.
+
+By default, complexity scores 1–3 use `gpt-5.6-luna` at `xhigh`; scores 4–5
+use `gpt-5.6-terra` at `xhigh`. The workflow can override the model and
+reasoning-effort inputs only when a provider names or supports them differently;
+routing remains controlled by the Agent Brief complexity score.
 
 ## What Cloud Reviewer guarantees
 

@@ -38,6 +38,7 @@ export function isSafeRepoPath(p) {
 /**
  * @typedef {object} Repo
  * @property {string} kind
+ * @property {string|undefined} [root] extracted repository root, for the isolated Cloud Coder only
  * @property {() => Promise<string[]>} list repository-relative paths
  * @property {(p: string) => Promise<string|null>} read
  * @property {() => Promise<void>} close
@@ -51,6 +52,17 @@ export async function openRepo(gh, { owner, repo, sha }) {
     core.warning(`Could not fetch the repository archive (${err.message}); falling back to the contents API.`);
     return apiRepo(gh, owner, repo, sha);
   }
+}
+
+/**
+ * Extract an editable repository snapshot for Cloud Coder.
+ *
+ * Unlike openRepo, this has no API fallback: coding and testing a partial tree
+ * would produce a misleading patch. The caller owns close() and never exposes
+ * the extracted root to the model as an arbitrary filesystem path.
+ */
+export function openArchiveRepo(gh, { owner, repo, sha }) {
+  return tarballRepo(gh, owner, repo, sha);
 }
 
 /** Use the API backend when only a small set of files is expected to be read. */
@@ -83,6 +95,7 @@ async function tarballRepo(gh, owner, repo, sha) {
     let listing = null;
     return {
       kind: 'archive',
+      root,
       list() {
         if (!listing) listing = walk(root, root);
         return listing;

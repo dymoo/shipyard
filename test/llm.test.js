@@ -80,6 +80,13 @@ test('request body leaves completion length to the provider and model', () => {
   assert.equal(body.provider, undefined);
 });
 
+test('sends configured reasoning effort and drops it only when the endpoint rejects it', () => {
+  const llm = new LLM({ ...base, reasoningEffort: 'xhigh' });
+  assert.equal(llm.buildBody([]).reasoning_effort, 'xhigh');
+  assert.equal(llm.adapt('reasoning_effort is unsupported'), true);
+  assert.equal('reasoning_effort' in llm.buildBody([]), false);
+});
+
 test('OpenRouter requests deny provider data collection and require ZDR', () => {
   const llm = new LLM({ ...base, baseUrl: 'https://openrouter.ai/api/v1' });
   const expectedPolicy = {
@@ -118,6 +125,37 @@ test('OpenRouter parameter adaptation never strips the provider privacy policy',
       zdr: true,
       require_parameters: true,
     });
+  }
+});
+
+test('OpenRouter retries a parameter-routing 404 without optional temperature', async () => {
+  const requests = [];
+  const llm = new LLM(
+    { ...base, baseUrl: 'https://openrouter.ai/api/v1' },
+    {
+      fetch: async (_url, init) => {
+        requests.push(JSON.parse(String(init.body)));
+        if (requests.length === 1) {
+          return new Response('No endpoints found that can handle the requested parameters.', { status: 404 });
+        }
+        return Response.json({ choices: [{ message: { content: 'ok' } }] });
+      },
+    },
+  );
+  const tools = [{ type: 'function', function: { name: 'read_file', parameters: { type: 'object' } } }];
+
+  await llm.send([{ role: 'user', content: 'review this' }], { tools });
+
+  assert.equal(requests.length, 2);
+  assert.equal(requests[0].temperature, 0.1);
+  assert.equal(requests[1].temperature, undefined);
+  for (const request of requests) {
+    assert.deepEqual(request.provider, {
+      data_collection: 'deny',
+      zdr: true,
+      require_parameters: true,
+    });
+    assert.deepEqual(request.tools, tools);
   }
 });
 

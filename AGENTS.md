@@ -68,6 +68,27 @@ preflight has a separate exact interface: `api-key`, `required-models`, `model`,
 API-key-only. ChatGPT subscription OAuth is deferred in
 `docs/codex-chatgpt-auth.md`.
 
+Cloud Coder's separate public inputs are `api-key`, `base-url`, `luna-model`,
+`terra-model`, `luna-reasoning-effort`, `terra-reasoning-effort`,
+`github-token` and `sandbox-image`. Scores 1–3 use Luna and scores 4–5 use
+Terra; both default to `xhigh`. It triggers from an `issues` label event for
+`ready-for-agent` or its one trusted `shipyard-repair` repository dispatch; it
+accepts an open Issue rather than a PR. The workflow must grant only
+`contents: write`, `issues: write` and
+`pull-requests: write`, must not check out repository code, and must pass a
+SHA-256 digest-pinned test image with a fixed job timeout. The Coder's host-side broker creates one
+`shipyard/issue-<number>` branch, one non-force commit and one draft PR only
+after the fixed Agent Brief test command passes in a no-network container.
+It then emits the `shipyard-review` repository-dispatch event; the separate
+Cloud Reviewer workflow must listen for that event so it runs with its own
+configured model and API key. For Coder-dispatched reviews only, the review
+host either emits one `shipyard-repair` event with bot-authored, verified
+findings or changes the Coder draft to ready-for-review and applies
+`ready-for-human`; it never lets the review model invoke GitHub mutations. The
+review workflow skips ordinary pull-request events for generated
+`shipyard/issue-*` branches so the repository-dispatch run is the only Coder
+review-and-handoff authority.
+
 ## Agent skills
 
 - **Issue tracker:** GitHub Issues in `dymoo/shipyard`. See
@@ -85,24 +106,25 @@ API-key-only. ChatGPT subscription OAuth is deferred in
 One responsibility per file. If you cannot say what a file is for in one line,
 it needs splitting.
 
-| File              | Owns                                                  |
-| ----------------- | ----------------------------------------------------- |
-| `src/index.js`    | Orchestration. No business logic.                     |
-| `src/config.js`   | Six inputs, fixed limits and event resolution         |
-| `src/prompts.js`  | Every prompt. The product's actual IP.                |
-| `src/schema.js`   | JSON Schemas for structured replies. Authoritative.   |
-| `src/review.js`   | The model passes: find and refute                     |
-| `src/findings.js` | The finding data model: normalise, merge, fingerprint |
-| `src/diff.js`     | Diff parsing and comment anchoring                    |
-| `src/context.js`  | File selection, context widening, chunking            |
-| `src/codebase.js` | Base-commit project-rule discovery                    |
-| `src/repo.js`     | Repository access at the head commit                  |
-| `src/agent.js`    | Read-only tools and the bounded investigation loop    |
-| `src/llm.js`      | OpenAI-compatible client, defensive JSON              |
-| `src/github.js`   | REST client                                           |
-| `src/post.js`     | Comment and summary rendering, posting                |
-| `src/core.js`     | The small `@actions/core` replacement                 |
-| `preflight/`      | Source-free OpenRouter policy and route verification  |
+| File              | Owns                                                                     |
+| ----------------- | ------------------------------------------------------------------------ |
+| `src/index.js`    | Orchestration. No business logic.                                        |
+| `src/config.js`   | Six inputs, fixed limits and event resolution                            |
+| `src/prompts.js`  | Every prompt. The product's actual IP.                                   |
+| `src/schema.js`   | JSON Schemas for structured replies. Authoritative.                      |
+| `src/review.js`   | The model passes: find and refute                                        |
+| `src/findings.js` | The finding data model: normalise, merge, fingerprint                    |
+| `src/diff.js`     | Diff parsing and comment anchoring                                       |
+| `src/context.js`  | File selection, context widening, chunking                               |
+| `src/codebase.js` | Base-commit project-rule discovery                                       |
+| `src/repo.js`     | Repository access at the head commit                                     |
+| `src/agent.js`    | Read-only tools and the bounded investigation loop                       |
+| `src/llm.js`      | OpenAI-compatible client, defensive JSON                                 |
+| `src/github.js`   | REST client                                                              |
+| `src/post.js`     | Comment and summary rendering, posting                                   |
+| `src/core.js`     | The small `@actions/core` replacement                                    |
+| `preflight/`      | Source-free OpenRouter policy and route verification                     |
+| `cloud-coder/`    | Separate Coder boundary: skills, mutable workspace and sandbox prototype |
 
 Dependencies point one way: `index.js` → everything, and modules do not import
 their callers. `post.js` must not import `review.js`; anything both need lives in
@@ -183,6 +205,9 @@ changed line and flags it`, not `test anchorFinding 3`.
 - `test/e2e.test.js` runs the real entrypoint against a stub GitHub API and a
   stub model. Anything touching orchestration, event handling or the request
   sequence belongs there.
+- Cloud Coder tests must prove the admission gate, lazy allowlisted skill
+  loading, workspace containment and Docker isolation without running Docker
+  or repository code in the test process.
 
 ## Prompts
 
@@ -216,6 +241,24 @@ Keep the diff to one purpose. If it does two things, it is two pull requests.
 
 ## Changelog
 
+- 2026-08-04: Hardened Cloud Coder publication and hand-off: verify the base
+  ref immediately before creating its branch, preserve regular-file mode, fail
+  reviewer-dispatch errors visibly, mask Coder keys immediately, and exercise
+  the entrypoint sequence end to end. The synthetic OpenRouter preflight also
+  omits optional temperature so Luna's strict tool route remains eligible.
+- 2026-08-04: Made the OpenRouter client recognise its parameter-routing 404
+  response and retry without only the optional temperature field; tool calling,
+  ZDR and required-parameter routing remain fixed.
+- 2026-08-04: Completed the finite Cloud Coder/Reviewer loop: one dispatched
+  reviewer repair, protected non-force repair commit, then `ready-for-human`
+  hand-off by a fixed host-side transition; generated branches skip duplicate
+  pull-request review runs.
+- 2026-08-04: Added the Cloud Coder Issue-to-draft-PR vertical slice: a
+  label-gated Issue Action, bounded coding tools, archive workspace, final
+  no-network test, non-force Git Data commit and draft PR broker.
+- 2026-08-04: Added the isolated Cloud Coder v1 security prototype: strict
+  Issue Brief admission, lazy immutable implementation skills, contained
+  workspace edits and a credential-free no-network Docker test boundary.
 - 2026-08-04: Removed the review client's completion-token cap; providers and
   models now control output length while request and input-context limits remain
   fixed.

@@ -125,6 +125,8 @@ function requiredHttpUrl(name, value) {
  * @property {number|null} [prNumber]
  * @property {string} [trigger]
  * @property {string} [focus]
+ * @property {number} [codingIssue]
+ * @property {number} [repairRound]
  * @property {string} [skip]
  */
 
@@ -162,6 +164,27 @@ export function readEvent() {
       trigger: 'mention',
       focus: extractFocus(body, TRIGGER_PHRASE),
     };
+  }
+
+  if (eventName === 'repository_dispatch') {
+    if (payload.action !== 'shipyard-review')
+      return { ...base, skip: 'repository dispatch is not for Shipyard review' };
+    const prNumber = payload.client_payload?.pull_request;
+    if (!Number.isInteger(prNumber) || prNumber < 1) {
+      return { ...base, skip: 'repository dispatch did not include a pull request number' };
+    }
+    const codingIssue = payload.client_payload?.issue;
+    const repairRound = payload.client_payload?.repair_round;
+    if (
+      !Number.isInteger(codingIssue) ||
+      codingIssue < 1 ||
+      !Number.isInteger(repairRound) ||
+      repairRound < 0 ||
+      repairRound > 1
+    ) {
+      return { ...base, skip: 'repository dispatch did not include a valid Cloud Coder Issue and repair round' };
+    }
+    return { ...base, prNumber, trigger: 'cloud-coder', codingIssue, repairRound };
   }
 
   if (eventName === 'pull_request' || eventName === 'pull_request_target') {

@@ -7,13 +7,18 @@ on:
     types: [opened, synchronize, reopened]
   issue_comment:
     types: [created]
+  repository_dispatch:
+    types: [shipyard-review]
 
 permissions:
-  contents: read
+  # Repository dispatch requires contents: write. Shipyard never exposes this
+  # token to the model and uses it only for the fixed repair hand-off.
+  contents: write
+  issues: write
   pull-requests: write
 
 concurrency:
-  group: shipyard-review-${{ github.event.pull_request.number || github.event.issue.number }}
+  group: shipyard-review-${{ github.event.pull_request.number || github.event.issue.number || github.event.client_payload.pull_request }}
   cancel-in-progress: true
 
 jobs:
@@ -21,7 +26,9 @@ jobs:
     if: >-
       vars.LLM_BASE_URL != '' &&
       vars.LLM_MODEL != '' &&
-      (github.event_name == 'pull_request_target' ||
+      ((github.event_name == 'pull_request_target' &&
+        !startsWith(github.event.pull_request.head.ref, 'shipyard/issue-')) ||
+       github.event_name == 'repository_dispatch' ||
        (github.event.issue.pull_request && contains(github.event.comment.body, '@shipyard')))
     runs-on: ubuntu-latest
     steps:

@@ -99,6 +99,7 @@ test('proves the exact key policy, models, ZDR tool route and first-party route 
     const body = JSON.parse(String(request.init.body));
     assert.equal(body.max_tokens, undefined);
     assert.equal(body.max_completion_tokens, undefined);
+    assert.equal(body.temperature, undefined);
     assert.deepEqual(
       {
         data_collection: body.provider.data_collection,

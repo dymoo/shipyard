@@ -124,7 +124,15 @@ async function stubServer({
   issueComments = [],
   reviewComments = [],
 } = {}) {
-  const captured = { reviews: [], createdComments: [], updatedComments: [], llmRequests: [] };
+  const captured = {
+    reviews: [],
+    createdComments: [],
+    updatedComments: [],
+    dispatchedEvents: [],
+    updatedPulls: [],
+    labels: [],
+    llmRequests: [],
+  };
   const tarball = makeTarball(repoFiles, symlinks);
 
   const server = http.createServer((req, res) => {
@@ -170,10 +178,11 @@ async function stubServer({
         return send(200, {
           number: 1,
           state: 'open',
+          draft: true,
           title: 'Guard the lookup',
           body: '',
           user: { login: 'alice' },
-          head: { sha: 'headsha' },
+          head: { sha: 'headsha', ref: 'shipyard/issue-7' },
           base: { ref: 'main', sha: 'basesha' },
         });
       }
@@ -186,6 +195,18 @@ async function stubServer({
       if (url.pathname === '/repos/o/r/pulls/1/reviews' && req.method === 'POST') {
         captured.reviews.push(JSON.parse(raw));
         return send(200, { id: 1 });
+      }
+      if (url.pathname === '/repos/o/r/dispatches' && req.method === 'POST') {
+        captured.dispatchedEvents.push(JSON.parse(raw));
+        return send(204, '');
+      }
+      if (url.pathname === '/repos/o/r/pulls/1' && req.method === 'PATCH') {
+        captured.updatedPulls.push(JSON.parse(raw));
+        return send(200, { number: 1 });
+      }
+      if (url.pathname === '/repos/o/r/issues/1/labels' && req.method === 'POST') {
+        captured.labels.push(JSON.parse(raw));
+        return send(200, []);
       }
       if (url.pathname === '/repos/o/r/issues/1/comments' && req.method === 'POST') {
         captured.createdComments.push(JSON.parse(raw));
@@ -328,6 +349,36 @@ test('a focused mention always reviews instead of being misclassified as chat', 
   assert.equal(run.outputs.reviewed, 'true');
   assert.equal(captured.reviews.length, 1);
   assert.match(captured.llmRequests.find(isReview).messages[1].content, /is the retry backoff correct\?/);
+});
+
+test('a Coder review dispatch requests exactly one repair when verified findings remain', async (t) => {
+  const { server, captured, port } = await stubServer();
+  t.after(() => server.close());
+
+  const run = await runAction(port, {
+    GITHUB_EVENT_NAME: 'repository_dispatch',
+    __event: { action: 'shipyard-review', client_payload: { pull_request: 1, issue: 7, repair_round: 0 } },
+  });
+  assert.equal(run.code, 0, run.stderr);
+  assert.deepEqual(captured.dispatchedEvents, [
+    { event_type: 'shipyard-repair', client_payload: { issue: 7, pull_request: 1, repair_round: 1 } },
+  ]);
+  assert.deepEqual(captured.updatedPulls, []);
+  assert.deepEqual(captured.labels, []);
+});
+
+test('a repaired Coder draft becomes ready for local review even when findings remain', async (t) => {
+  const { server, captured, port } = await stubServer();
+  t.after(() => server.close());
+
+  const run = await runAction(port, {
+    GITHUB_EVENT_NAME: 'repository_dispatch',
+    __event: { action: 'shipyard-review', client_payload: { pull_request: 1, issue: 7, repair_round: 1 } },
+  });
+  assert.equal(run.code, 0, run.stderr);
+  assert.deepEqual(captured.dispatchedEvents, []);
+  assert.deepEqual(captured.updatedPulls, [{ draft: false }]);
+  assert.deepEqual(captured.labels, [{ labels: ['ready-for-human'] }]);
 });
 
 test('the investigation can read repository evidence with tools', async (t) => {
