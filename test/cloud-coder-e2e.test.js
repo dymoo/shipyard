@@ -152,10 +152,10 @@ async function runAction(port, dockerDirectory) {
     'INPUT_GITHUB-TOKEN': 'github-secret',
     'INPUT_HANDOFF-TOKEN': 'handoff-secret',
     'INPUT_BASE-URL': `http://127.0.0.1:${port}/v1`,
-    'INPUT_LUNA-MODEL': 'luna',
-    'INPUT_TERRA-MODEL': 'terra',
-    'INPUT_LUNA-REASONING-EFFORT': 'xhigh',
-    'INPUT_TERRA-REASONING-EFFORT': 'xhigh',
+    'INPUT_LOW-COMPLEXITY-MODEL': 'low-model',
+    'INPUT_HIGH-COMPLEXITY-MODEL': 'high-model',
+    'INPUT_LOW-COMPLEXITY-REASONING-EFFORT': 'xhigh',
+    'INPUT_HIGH-COMPLEXITY-REASONING-EFFORT': 'xhigh',
     'INPUT_SANDBOX-IMAGE': IMAGE,
   };
   const child = spawn(process.execPath, [ENTRY], { env, stdio: ['ignore', 'pipe', 'pipe'] });

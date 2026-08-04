@@ -4,6 +4,7 @@ import {
   assertAdmissibleIssue,
   modelForComplexity,
   parseAgentBrief,
+  readConfig,
   reasoningEffortForComplexity,
 } from '../cloud-coder/src/config.js';
 
@@ -47,17 +48,73 @@ test('accepts only an open ready-for-agent Issue', () => {
   assert.throws(() => assertAdmissibleIssue({ ...issue, pull_request: {} }), /Issue rather than a pull request/i);
 });
 
-test('routes low and mid complexity to Luna, higher complexity to Terra', () => {
+test('routes low and mid complexity to the configured low tier, higher complexity to the configured high tier', () => {
   const config = {
-    lunaModel: 'luna',
-    terraModel: 'terra',
-    lunaReasoningEffort: 'xhigh',
-    terraReasoningEffort: 'high',
+    lowComplexityModel: 'low-model',
+    highComplexityModel: 'high-model',
+    lowComplexityReasoningEffort: 'xhigh',
+    highComplexityReasoningEffort: 'high',
   };
-  assert.equal(modelForComplexity(config, 1), 'luna');
-  assert.equal(modelForComplexity(config, 3), 'luna');
-  assert.equal(modelForComplexity(config, 4), 'terra');
-  assert.equal(modelForComplexity(config, 5), 'terra');
+  assert.equal(modelForComplexity(config, 1), 'low-model');
+  assert.equal(modelForComplexity(config, 3), 'low-model');
+  assert.equal(modelForComplexity(config, 4), 'high-model');
+  assert.equal(modelForComplexity(config, 5), 'high-model');
   assert.equal(reasoningEffortForComplexity(config, 1), 'xhigh');
   assert.equal(reasoningEffortForComplexity(config, 5), 'high');
+
+  const withoutReasoningEffort = {
+    lowComplexityModel: 'low-model',
+    highComplexityModel: 'high-model',
+    lowComplexityReasoningEffort: '',
+    highComplexityReasoningEffort: '',
+  };
+  assert.equal(reasoningEffortForComplexity(withoutReasoningEffort, 1), '');
+  assert.equal(reasoningEffortForComplexity(withoutReasoningEffort, 5), '');
+});
+
+test('accepts deprecated model input aliases only when generic tier inputs are absent', (t) => {
+  const keys = [
+    'GITHUB_API_URL',
+    'INPUT_API-KEY',
+    'INPUT_BASE-URL',
+    'INPUT_GITHUB-TOKEN',
+    'INPUT_HANDOFF-TOKEN',
+    'INPUT_LUNA-MODEL',
+    'INPUT_TERRA-MODEL',
+    'INPUT_LUNA-REASONING-EFFORT',
+    'INPUT_TERRA-REASONING-EFFORT',
+    'INPUT_LOW-COMPLEXITY-MODEL',
+    'INPUT_HIGH-COMPLEXITY-MODEL',
+    'INPUT_SANDBOX-IMAGE',
+  ];
+  const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+  t.after(() => {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
+  Object.assign(process.env, {
+    GITHUB_API_URL: 'https://api.github.test',
+    'INPUT_API-KEY': 'model-secret',
+    'INPUT_BASE-URL': 'https://model.test/v1',
+    'INPUT_GITHUB-TOKEN': 'github-secret',
+    'INPUT_HANDOFF-TOKEN': 'handoff-secret',
+    'INPUT_LUNA-MODEL': 'legacy-low',
+    'INPUT_TERRA-MODEL': 'legacy-high',
+    'INPUT_LUNA-REASONING-EFFORT': 'high',
+    'INPUT_TERRA-REASONING-EFFORT': 'xhigh',
+    'INPUT_SANDBOX-IMAGE': 'example.test/image@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+  const legacy = readConfig();
+  assert.equal(legacy.lowComplexityModel, 'legacy-low');
+  assert.equal(legacy.highComplexityModel, 'legacy-high');
+  assert.equal(legacy.lowComplexityReasoningEffort, 'high');
+  assert.equal(legacy.highComplexityReasoningEffort, 'xhigh');
+
+  process.env['INPUT_LOW-COMPLEXITY-MODEL'] = 'generic-low';
+  process.env['INPUT_HIGH-COMPLEXITY-MODEL'] = 'generic-high';
+  const generic = readConfig();
+  assert.equal(generic.lowComplexityModel, 'generic-low');
+  assert.equal(generic.highComplexityModel, 'generic-high');
 });

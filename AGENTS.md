@@ -74,12 +74,17 @@ forbids it. The source-free OpenRouter preflight has a separate exact interface:
 ChatGPT subscription OAuth is deferred in
 `docs/codex-chatgpt-auth.md`.
 
-Cloud Coder's separate public inputs are `api-key`, `base-url`, `luna-model`,
-`terra-model`, `luna-reasoning-effort`, `terra-reasoning-effort`,
-`github-token`, `handoff-token` and `sandbox-image`. Scores 1–3 use Luna and scores 4–5 use
-Terra; both default to `xhigh`. It triggers from an `issues` label event for
-`ready-for-agent` or its one trusted `shipyard-repair` repository dispatch; it
-accepts an open Issue rather than a PR. The workflow must grant only
+Cloud Coder's separate public inputs are `api-key`, `base-url`,
+`low-complexity-model`, `high-complexity-model`,
+`low-complexity-reasoning-effort`, `high-complexity-reasoning-effort`,
+`github-token`, `handoff-token` and `sandbox-image`. Scores 1–3 use the
+configured low-complexity model and scores 4–5 use the configured
+high-complexity model; reasoning effort is optional and omitted when empty. It
+accepts the prior Luna/Terra-named inputs as deprecated compatibility aliases
+without model defaults; new workflows must use the generic tier names. It
+triggers from an `issues` label event for `ready-for-agent` or its one trusted
+`shipyard-repair` repository dispatch; it accepts an open Issue rather than a
+PR. The workflow must grant only
 `contents: write`, `issues: write` and
 `pull-requests: write`, must not check out repository code, and must pass a
 SHA-256 digest-pinned test image with a fixed job timeout. The Coder's host-side broker creates one
@@ -101,15 +106,16 @@ to their Shipyard action before a runner starts; a recognised dispatch without
 its configured HMAC token/proof fails visibly.
 
 Shipyard's own pilot Coder workflow is `.github/workflows/shipyard-coder.yml`.
-It uses `openai/gpt-5.6-luna` at `xhigh`, the shared hand-off secret and the
-digest-pinned Node 20 sandbox image. Its only supported pilot test command is
-`npm test`; a consumer that needs package binaries must publish a test-toolchain
-image and pass that image's immutable digest instead. Cloud Coder and Cloud
-Reviewer run on the ARC release-name label `shipyard-runners`. That runner is
-dedicated, repository-scoped infrastructure with Docker; it receives model and
-GitHub credentials and must not be shared with unrelated untrusted workloads.
-Ordinary CI remains on GitHub-hosted runners. A non-ARC install must replace the
-example label with its own dedicated runner label.
+It reads its low/high model tiers and optional reasoning efforts from repository
+Variables, plus the shared hand-off secret and digest-pinned Node 20 sandbox
+image. Its only supported pilot test command is `npm test`; a consumer that
+needs package binaries must publish a test-toolchain image and pass that image's
+immutable digest instead. Cloud Coder and Cloud Reviewer run on the ARC
+release-name label `shipyard-runners`. That runner is dedicated,
+repository-scoped infrastructure with Docker; it receives model and GitHub
+credentials and must not be shared with unrelated untrusted workloads. Ordinary
+CI remains on GitHub-hosted runners. A non-ARC install must replace the example
+label with its own dedicated runner label.
 
 ## Agent skills
 
@@ -264,6 +270,10 @@ Keep the diff to one purpose. If it does two things, it is two pull requests.
 
 ## Changelog
 
+- 2026-08-04: Made Cloud Coder model tiers and reasoning effort repository
+  configuration rather than Luna/Terra action defaults, retaining deprecated
+  aliases until the next major version; routing remains bound to the Agent Brief
+  complexity score.
 - 2026-08-04: Removed the obsolete `temperature` request parameter and its
   fallback retry from both Coder and Reviewer model calls; reasoning models now
   use their provider defaults without an avoidable failed request.

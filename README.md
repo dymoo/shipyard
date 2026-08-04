@@ -116,9 +116,9 @@ jobs:
     steps:
       - uses: dymoo/shipyard@v3
         with:
-          api-key: ${{ secrets.OPENAI_API_KEY }}
-          base-url: https://api.openai.com/v1
-          model: gpt-5.6-luna
+          api-key: ${{ secrets.LLM_API_KEY }}
+          base-url: ${{ vars.LLM_BASE_URL }}
+          model: ${{ vars.SHIPYARD_REVIEW_MODEL }}
           handoff-token: ${{ secrets.SHIPYARD_HANDOFF_TOKEN }}
 ```
 
@@ -172,14 +172,15 @@ Install Shipyard Cloud Reviewer in this repository.
 
 ## Models
 
-The Cloud Coder default is **GPT-5.6 Luna with `xhigh` reasoning**. It is the
-starting point because the useful unit is cost per _accepted_ PR, not cost per
-raw token. Scores 4–5 route to GPT-5.6 Terra at `high` or `xhigh`; DeepSeek V4
-Flash remains an evaluated cost-sensitive alternative.
+Model choice is repository configuration, never Shipyard action code. The
+Coder requires a low-complexity model for scores 1–3 and a high-complexity
+model for scores 4–5; reasoning effort is optional for each tier and omitted
+when the provider does not support it.
 
-`gpt-5.6-luna` is the API model identifier. `xhigh` is a reasoning-effort
-setting for Cloud Coder's harness, not an input on the seven-input,
-provider-agnostic reviewer.
+Our current recommendation is GPT-5.6 Luna at `xhigh` for scores 1–3 and
+GPT-5.6 Terra at `xhigh` for scores 4–5: the useful unit is cost per
+_accepted_ PR, not cost per raw token. DeepSeek V4 Flash remains an evaluated
+cost-sensitive alternative. These are recommendations, not defaults.
 
 ## Add Shipyard Cloud Coder
 
@@ -199,6 +200,24 @@ model and GitHub credentials and must not be shared with untrusted workloads.
 For a non-ARC runner, replace that label with your dedicated runner label. Keep
 ordinary CI on GitHub-hosted runners unless it independently needs your local
 environment.
+
+Set these repository **Variables** before enabling the Coder:
+
+| Variable                                          | Purpose                                      |
+| ------------------------------------------------- | -------------------------------------------- |
+| `LLM_BASE_URL`                                    | OpenAI-compatible API base URL.              |
+| `SHIPYARD_CODER_LOW_COMPLEXITY_MODEL`             | Model for Agent Brief complexity scores 1–3. |
+| `SHIPYARD_CODER_HIGH_COMPLEXITY_MODEL`            | Model for Agent Brief complexity scores 4–5. |
+| `SHIPYARD_CODER_LOW_COMPLEXITY_REASONING_EFFORT`  | Optional effort for scores 1–3.              |
+| `SHIPYARD_CODER_HIGH_COMPLEXITY_REASONING_EFFORT` | Optional effort for scores 4–5.              |
+| `SHIPYARD_REVIEW_MODEL`                           | Reviewer model.                              |
+
+The two model variables are required. Leave either reasoning-effort variable
+empty when its provider does not support that parameter.
+
+`cloud-coder@v3` continues to accept its former Luna/Terra-named inputs as
+deprecated aliases with no model defaults. Use the generic tier inputs above;
+the aliases will be removed only in the next major version.
 
 This repository's own pilot workflow uses the official digest-pinned Node 20
 image and `npm test`, because its test command uses only Node's built-in test
@@ -222,10 +241,9 @@ write` because Shipyard's host-side broker creates the branch, draft PR and
 run comment. Its 45-minute job limit is deliberate: the model does not receive
 that token or a shell, but an agentic run must still have an unambiguous end.
 
-By default, complexity scores 1–3 use `gpt-5.6-luna` at `xhigh`; scores 4–5
-use `gpt-5.6-terra` at `xhigh`. The workflow can override the model and
-reasoning-effort inputs only when a provider names or supports them differently;
-routing remains controlled by the Agent Brief complexity score.
+The Coder has no model defaults. It takes its two model tiers and optional
+reasoning efforts from repository Variables; routing remains controlled by the
+Agent Brief complexity score.
 
 ## What Cloud Reviewer guarantees
 

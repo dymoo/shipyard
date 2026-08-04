@@ -29,13 +29,14 @@ test('Cloud Coder action declares the bounded implementation contract', () => {
   const action = fs.readFileSync(new URL('../cloud-coder/action.yml', import.meta.url), 'utf8');
   assert.match(action, /^name: Shipyard Cloud Coder$/m);
   assert.match(action, /sandbox-image:/);
-  assert.match(action, /luna-model:/);
-  assert.match(action, /terra-model:/);
-  assert.match(action, /luna-reasoning-effort:/);
-  assert.match(action, /terra-reasoning-effort:/);
+  assert.match(action, /low-complexity-model:/);
+  assert.match(action, /high-complexity-model:/);
+  assert.match(action, /low-complexity-reasoning-effort:/);
+  assert.match(action, /high-complexity-reasoning-effort:/);
+  assert.match(action, /luna-model:\n {4}description: Deprecated alias/);
+  assert.match(action, /terra-model:\n {4}description: Deprecated alias/);
   assert.match(action, /handoff-token:/);
-  assert.match(action, /default: gpt-5\.6-luna/);
-  assert.match(action, /default: gpt-5\.6-terra/);
+  assert.doesNotMatch(action, /gpt-5\.6-(?:luna|terra)/);
   assert.match(action, /main: src\/index\.js/);
 });
 
@@ -44,7 +45,8 @@ test('the Shipyard pilot workflow routes only ready Issues through a pinned Node
   assert.match(workflow, /^name: Shipyard Cloud Coder$/m);
   assert.match(workflow, /github\.event\.label\.name == 'ready-for-agent'/);
   assert.match(workflow, /github\.event\.action == 'shipyard-repair'/);
-  assert.match(workflow, /luna-model: openai\/gpt-5\.6-luna/);
+  assert.match(workflow, /low-complexity-model: \$\{\{ vars\.SHIPYARD_CODER_LOW_COMPLEXITY_MODEL \}\}/);
+  assert.match(workflow, /high-complexity-model: \$\{\{ vars\.SHIPYARD_CODER_HIGH_COMPLEXITY_MODEL \}\}/);
   assert.match(workflow, /runs-on: shipyard-runners/);
   assert.match(workflow, /sandbox-image: node:20-bookworm-slim@sha256:[a-f0-9]{64}/);
   assert.match(workflow, /handoff-token: \$\{\{ secrets\.SHIPYARD_HANDOFF_TOKEN \}\}/);

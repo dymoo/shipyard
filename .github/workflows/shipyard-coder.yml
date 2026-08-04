@@ -19,6 +19,8 @@ jobs:
   code:
     if: >-
       vars.LLM_BASE_URL != '' &&
+      vars.SHIPYARD_CODER_LOW_COMPLEXITY_MODEL != '' &&
+      vars.SHIPYARD_CODER_HIGH_COMPLEXITY_MODEL != '' &&
       ((github.event_name == 'issues' &&
         github.event.action == 'labeled' &&
         github.event.label.name == 'ready-for-agent' &&
@@ -31,9 +33,9 @@ jobs:
         with:
           api-key: ${{ secrets.LLM_API_KEY }}
           base-url: ${{ vars.LLM_BASE_URL }}
-          luna-model: openai/gpt-5.6-luna
-          terra-model: openai/gpt-5.6-terra
-          luna-reasoning-effort: xhigh
-          terra-reasoning-effort: xhigh
+          low-complexity-model: ${{ vars.SHIPYARD_CODER_LOW_COMPLEXITY_MODEL }}
+          high-complexity-model: ${{ vars.SHIPYARD_CODER_HIGH_COMPLEXITY_MODEL }}
+          low-complexity-reasoning-effort: ${{ vars.SHIPYARD_CODER_LOW_COMPLEXITY_REASONING_EFFORT }}
+          high-complexity-reasoning-effort: ${{ vars.SHIPYARD_CODER_HIGH_COMPLEXITY_REASONING_EFFORT }}
           handoff-token: ${{ secrets.SHIPYARD_HANDOFF_TOKEN }}
           sandbox-image: node:20-bookworm-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0
