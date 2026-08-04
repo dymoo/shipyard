@@ -55,6 +55,9 @@ test('the Shipyard pilot workflow routes only ready Issues through a pinned Node
   assert.match(workflow, /handoff-token: \$\{\{ secrets\.SHIPYARD_HANDOFF_TOKEN \}\}/);
 
   const example = fs.readFileSync(new URL('../examples/workflows/shipyard-coder.yml', import.meta.url), 'utf8');
+  assert.match(example, /vars\.LLM_BASE_URL != ''/);
+  assert.match(example, /vars\.SHIPYARD_CODER_LOW_COMPLEXITY_MODEL != ''/);
+  assert.match(example, /vars\.SHIPYARD_CODER_HIGH_COMPLEXITY_MODEL != ''/);
   assert.match(example, /github\.event\.issue\.state == 'open'/);
 });
 
