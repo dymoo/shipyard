@@ -69,7 +69,10 @@ workflow file, repository Variable, model prompt, or command output.
 2. Replace the example runner label and sandbox-image placeholder with the
    confirmed dedicated label and digest. Do not add checkout, install, build or
    shell steps to the Reviewer workflow. Both actions receive only their
-   documented inputs.
+   documented inputs. When discovery found existing secret names, replace
+   `secrets.LLM_API_KEY` and `secrets.SHIPYARD_HANDOFF_TOKEN` in both copied
+   workflows with those names; otherwise create secrets with exactly the example
+   names. The Coder and Reviewer must reference the same hand-off secret name.
 
 3. Configure repository **Variables**, never action defaults:
 
