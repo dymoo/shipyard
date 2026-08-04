@@ -30,7 +30,7 @@ jobs:
     runs-on: shipyard-runners
     timeout-minutes: 45
     steps:
-      - uses: dymoo/shipyard/cloud-coder@v3
+      - uses: dymoo/shipyard/cloud-coder@v4
         with:
           api-key: ${{ secrets.LLM_API_KEY }}
           base-url: ${{ vars.LLM_BASE_URL }}

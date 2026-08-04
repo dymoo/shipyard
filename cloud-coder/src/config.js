@@ -69,10 +69,10 @@ export function readConfig() {
     githubToken,
     handoffToken,
     baseUrl: requiredUrl('base-url', requiredInput('base-url')),
-    lowComplexityModel: requiredInput('low-complexity-model', 'luna-model'),
-    highComplexityModel: requiredInput('high-complexity-model', 'terra-model'),
-    lowComplexityReasoningEffort: optionalInput('low-complexity-reasoning-effort', 'luna-reasoning-effort'),
-    highComplexityReasoningEffort: optionalInput('high-complexity-reasoning-effort', 'terra-reasoning-effort'),
+    lowComplexityModel: requiredInput('low-complexity-model'),
+    highComplexityModel: requiredInput('high-complexity-model'),
+    lowComplexityReasoningEffort: core.getInput('low-complexity-reasoning-effort'),
+    highComplexityReasoningEffort: core.getInput('high-complexity-reasoning-effort'),
     sandboxImage: requiredInput('sandbox-image'),
     githubApiUrl: requiredUrl('GITHUB_API_URL', requiredEnv('GITHUB_API_URL')),
     ...LIMITS,
@@ -136,18 +136,10 @@ export function readIssueEvent(handoffToken = '') {
   return { owner, repo, issueNumber: payload.issue.number };
 }
 
-function requiredInput(...names) {
-  const value = optionalInput(...names);
+function requiredInput(name) {
+  const value = core.getInput(name);
   if (value) return value;
-  throw new Error(`One of inputs "${names.join('", "')}" is required and resolved to an empty value.`);
-}
-
-function optionalInput(...names) {
-  for (const name of names) {
-    const value = core.getInput(name);
-    if (value) return value;
-  }
-  return '';
+  throw new Error(`Input "${name}" is required and resolved to an empty value.`);
 }
 
 function requiredEnv(name) {

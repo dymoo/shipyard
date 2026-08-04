@@ -271,9 +271,8 @@ Keep the diff to one purpose. If it does two things, it is two pull requests.
 ## Changelog
 
 - 2026-08-04: Made Cloud Coder model tiers and reasoning effort repository
-  configuration rather than Luna/Terra action defaults, retaining deprecated
-  aliases until the next major version; routing remains bound to the Agent Brief
-  complexity score.
+  configuration rather than Luna/Terra action defaults. Cloud Coder v4 uses only
+  generic tier inputs; the unchanged v3 tag retains the legacy interface.
 - 2026-08-04: Removed the obsolete `temperature` request parameter and its
   fallback retry from both Coder and Reviewer model calls; reasoning models now
   use their provider defaults without an avoidable failed request.

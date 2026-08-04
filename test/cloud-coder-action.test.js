@@ -31,12 +31,11 @@ test('Cloud Coder action declares the bounded implementation contract', () => {
   assert.match(action, /sandbox-image:/);
   assert.match(action, /low-complexity-model:/);
   assert.match(action, /high-complexity-model:/);
-  assert.match(action, /low-complexity-model:\n {4}description:.*\n {4}required: false/);
-  assert.match(action, /high-complexity-model:\n {4}description:.*\n {4}required: false/);
+  assert.match(action, /low-complexity-model:\n {4}description:.*\n {4}required: true/);
+  assert.match(action, /high-complexity-model:\n {4}description:.*\n {4}required: true/);
   assert.match(action, /low-complexity-reasoning-effort:/);
   assert.match(action, /high-complexity-reasoning-effort:/);
-  assert.match(action, /luna-model:\n {4}description: Deprecated alias/);
-  assert.match(action, /terra-model:\n {4}description: Deprecated alias/);
+  assert.doesNotMatch(action, /(?:luna|terra)-(?:model|reasoning-effort)/);
   assert.match(action, /handoff-token:/);
   assert.doesNotMatch(action, /gpt-5\.6-(?:luna|terra)/);
   assert.match(action, /main: src\/index\.js/);

@@ -72,19 +72,17 @@ test('routes low and mid complexity to the configured low tier, higher complexit
   assert.equal(reasoningEffortForComplexity(withoutReasoningEffort, 5), '');
 });
 
-test('accepts deprecated model input aliases only when generic tier inputs are absent', (t) => {
+test('requires generic model tier inputs', (t) => {
   const keys = [
     'GITHUB_API_URL',
     'INPUT_API-KEY',
     'INPUT_BASE-URL',
     'INPUT_GITHUB-TOKEN',
     'INPUT_HANDOFF-TOKEN',
-    'INPUT_LUNA-MODEL',
-    'INPUT_TERRA-MODEL',
-    'INPUT_LUNA-REASONING-EFFORT',
-    'INPUT_TERRA-REASONING-EFFORT',
     'INPUT_LOW-COMPLEXITY-MODEL',
     'INPUT_HIGH-COMPLEXITY-MODEL',
+    'INPUT_LOW-COMPLEXITY-REASONING-EFFORT',
+    'INPUT_HIGH-COMPLEXITY-REASONING-EFFORT',
     'INPUT_SANDBOX-IMAGE',
   ];
   const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
@@ -100,21 +98,18 @@ test('accepts deprecated model input aliases only when generic tier inputs are a
     'INPUT_BASE-URL': 'https://model.test/v1',
     'INPUT_GITHUB-TOKEN': 'github-secret',
     'INPUT_HANDOFF-TOKEN': 'handoff-secret',
-    'INPUT_LUNA-MODEL': 'legacy-low',
-    'INPUT_TERRA-MODEL': 'legacy-high',
-    'INPUT_LUNA-REASONING-EFFORT': 'high',
-    'INPUT_TERRA-REASONING-EFFORT': 'xhigh',
+    'INPUT_LOW-COMPLEXITY-MODEL': 'configured-low',
+    'INPUT_HIGH-COMPLEXITY-MODEL': 'configured-high',
+    'INPUT_LOW-COMPLEXITY-REASONING-EFFORT': 'high',
+    'INPUT_HIGH-COMPLEXITY-REASONING-EFFORT': 'xhigh',
     'INPUT_SANDBOX-IMAGE': 'example.test/image@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   });
-  const legacy = readConfig();
-  assert.equal(legacy.lowComplexityModel, 'legacy-low');
-  assert.equal(legacy.highComplexityModel, 'legacy-high');
-  assert.equal(legacy.lowComplexityReasoningEffort, 'high');
-  assert.equal(legacy.highComplexityReasoningEffort, 'xhigh');
+  const config = readConfig();
+  assert.equal(config.lowComplexityModel, 'configured-low');
+  assert.equal(config.highComplexityModel, 'configured-high');
+  assert.equal(config.lowComplexityReasoningEffort, 'high');
+  assert.equal(config.highComplexityReasoningEffort, 'xhigh');
 
-  process.env['INPUT_LOW-COMPLEXITY-MODEL'] = 'generic-low';
-  process.env['INPUT_HIGH-COMPLEXITY-MODEL'] = 'generic-high';
-  const generic = readConfig();
-  assert.equal(generic.lowComplexityModel, 'generic-low');
-  assert.equal(generic.highComplexityModel, 'generic-high');
+  delete process.env['INPUT_HIGH-COMPLEXITY-MODEL'];
+  assert.throws(() => readConfig(), /high-complexity-model.*required/i);
 });

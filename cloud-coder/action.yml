@@ -15,27 +15,15 @@ inputs:
     required: true
   low-complexity-model:
     description: Model for Agent Brief complexity scores 1–3.
-    required: false
+    required: true
   high-complexity-model:
     description: Model for Agent Brief complexity scores 4–5.
-    required: false
+    required: true
   low-complexity-reasoning-effort:
     description: Optional reasoning effort for Agent Brief complexity scores 1–3.
     required: false
   high-complexity-reasoning-effort:
     description: Optional reasoning effort for Agent Brief complexity scores 4–5.
-    required: false
-  luna-model:
-    description: Deprecated alias for low-complexity-model. Use the generic input in new workflows.
-    required: false
-  terra-model:
-    description: Deprecated alias for high-complexity-model. Use the generic input in new workflows.
-    required: false
-  luna-reasoning-effort:
-    description: Deprecated alias for low-complexity-reasoning-effort.
-    required: false
-  terra-reasoning-effort:
-    description: Deprecated alias for high-complexity-reasoning-effort.
     required: false
   github-token:
     description: Token used only by Shipyard's host-side GitHub broker.

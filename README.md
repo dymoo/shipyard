@@ -13,7 +13,7 @@ implementation, independent adversarial review, and a hand-off for your final
 merge decision.
 
 **Released now:** Shipyard Cloud Reviewer at `dymoo/shipyard@v3` and Cloud
-Coder at `dymoo/shipyard/cloud-coder@v3`.
+Coder at `dymoo/shipyard/cloud-coder@v4`.
 
 ## The loop
 
@@ -157,7 +157,8 @@ Install Shipyard Cloud Reviewer in this repository.
 2. Create .github/workflows/shipyard-reviewer.yml from
    https://github.com/dymoo/shipyard/blob/main/README.md.
 3. Reuse an existing OpenAI-compatible secret name, otherwise use
-   OPENAI_API_KEY. Never put a key in a workflow file.
+   `LLM_API_KEY`. Set `LLM_BASE_URL` and `LLM_MODEL` as repository Variables.
+   Never put a key in a workflow file.
 4. Preserve pull_request_target without checking out, installing, building or
    executing pull-request code in the reviewer job.
 5. Use the real endpoint/model available to the repository. Prefer
@@ -167,7 +168,7 @@ Install Shipyard Cloud Reviewer in this repository.
    Shipyard actions as `handoff-token`. Do not add any secret to a
    `repository_dispatch` payload.
 7. Run the repository's workflow validation, then show the complete diff and
-   identify the secret the maintainer must add.
+   identify the secret and Variables the maintainer must add.
 ```
 
 ## Models
@@ -215,16 +216,16 @@ Set these repository **Variables** before enabling the Coder:
 The two model variables are required. Leave either reasoning-effort variable
 empty when its provider does not support that parameter.
 
-`cloud-coder@v3` continues to accept its former Luna/Terra-named inputs as
-deprecated aliases with no model defaults. Use the generic tier inputs above;
-the aliases will be removed only in the next major version.
+Cloud Coder v4 has no model defaults or model-branded inputs. Configure the two
+generic tier Variables above; existing v3 installations remain available at
+`cloud-coder@v3`.
 
 This repository's own pilot Agent Briefs use the official digest-pinned Node 20
 image and `npm test`, because that command uses only Node's built-in test
 runner. A consumer whose Agent Brief declares another test command must publish
 an image containing that toolchain and use its immutable digest.
 
-Use `dymoo/shipyard/cloud-coder@v3` in the copied workflow. Both actions must
+Use `dymoo/shipyard/cloud-coder@v4` in the copied workflow. Both actions must
 receive the same `SHIPYARD_HANDOFF_TOKEN`; Shipyard uses it only to sign and
 verify context-bound HMAC hand-offs, never stores it in the dispatch payload,
 and never exposes it to either model.
