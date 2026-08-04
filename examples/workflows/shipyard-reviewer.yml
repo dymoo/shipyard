@@ -31,7 +31,7 @@ jobs:
        !startsWith(github.event.pull_request.head.ref, 'shipyard/issue-')) ||
       (github.event_name == 'repository_dispatch' && github.event.action == 'shipyard-review') ||
       (github.event.issue.pull_request && contains(github.event.comment.body, '@shipyard'))
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: dymoo/shipyard@v3
         with:

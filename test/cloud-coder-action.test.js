@@ -45,6 +45,7 @@ test('the Shipyard pilot workflow routes only ready Issues through a pinned Node
   assert.match(workflow, /github\.event\.label\.name == 'ready-for-agent'/);
   assert.match(workflow, /github\.event\.action == 'shipyard-repair'/);
   assert.match(workflow, /luna-model: openai\/gpt-5\.6-luna/);
+  assert.match(workflow, /runs-on: self-hosted/);
   assert.match(workflow, /sandbox-image: node:20-bookworm-slim@sha256:[a-f0-9]{64}/);
   assert.match(workflow, /handoff-token: \$\{\{ secrets\.SHIPYARD_HANDOFF_TOKEN \}\}/);
 });

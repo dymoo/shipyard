@@ -104,7 +104,11 @@ Shipyard's own pilot Coder workflow is `.github/workflows/shipyard-coder.yml`.
 It uses `openai/gpt-5.6-luna` at `xhigh`, the shared hand-off secret and the
 digest-pinned Node 20 sandbox image. Its only supported pilot test command is
 `npm test`; a consumer that needs package binaries must publish a test-toolchain
-image and pass that image's immutable digest instead.
+image and pass that image's immutable digest instead. Cloud Coder and Cloud
+Reviewer run on the `self-hosted` runner label. That runner is dedicated trusted
+infrastructure with Docker; it receives model and GitHub credentials and must
+not be shared with unrelated untrusted workloads. Ordinary CI remains on
+GitHub-hosted runners.
 
 ## Agent skills
 
@@ -268,6 +272,9 @@ Keep the diff to one purpose. If it does two things, it is two pull requests.
 - 2026-08-04: Made exact OpenRouter Coder and Reviewer calls use one
   run-scoped sticky prompt-cache session, and exposed provider cache-read/write
   token counts in the review summary without enabling response caching.
+- 2026-08-04: Moved Cloud Coder and Cloud Reviewer workflows and installation
+  examples to the dedicated `self-hosted` runner boundary; ordinary CI remains
+  GitHub-hosted.
 - 2026-08-04: Added Shipyard's first Cloud Coder pilot workflow, using a
   digest-pinned Node 20 sandbox and the existing `npm test` command; documented
   local Shipyard-skill installation in the README.
