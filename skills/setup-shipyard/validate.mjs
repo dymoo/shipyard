@@ -150,23 +150,38 @@ function validateLiveConfiguration(config) {
     SHIPYARD_CODER_HIGH_COMPLEXITY_MODEL: config.highComplexityModel,
     SHIPYARD_CODER_READY: 'false',
   };
-  if (config.lowComplexityReasoningEffort) {
-    expectedVariables.SHIPYARD_CODER_LOW_COMPLEXITY_REASONING_EFFORT = config.lowComplexityReasoningEffort;
-  }
-  if (config.highComplexityReasoningEffort) {
-    expectedVariables.SHIPYARD_CODER_HIGH_COMPLEXITY_REASONING_EFFORT = config.highComplexityReasoningEffort;
-  }
+  const variables = Object.fromEntries(
+    JSON.parse(runGh(config, ['variable', 'list', '--repo', config.repository, '--json', 'name,value'])).map(
+      ({ name, value }) => [name, value],
+    ),
+  );
   for (const [name, expected] of Object.entries(expectedVariables)) {
-    if (runGh(config, ['variable', 'get', name, '--repo', config.repository]) !== expected) {
+    if (variables[name] !== expected) {
       throw new Error(`${name} must match the confirmed pre-enable configuration.`);
     }
   }
+  validateOptionalReasoningEffort(
+    variables,
+    'SHIPYARD_CODER_LOW_COMPLEXITY_REASONING_EFFORT',
+    config.lowComplexityReasoningEffort,
+  );
+  validateOptionalReasoningEffort(
+    variables,
+    'SHIPYARD_CODER_HIGH_COMPLEXITY_REASONING_EFFORT',
+    config.highComplexityReasoningEffort,
+  );
   const secretNames = JSON.parse(runGh(config, ['secret', 'list', '--repo', config.repository, '--json', 'name']));
   if (
     !Array.isArray(secretNames) ||
     ![config.modelSecret, config.handoffSecret].every((name) => secretNames.some(({ name: found }) => found === name))
   ) {
     throw new Error('Configured model and hand-off secret names must both exist in the repository.');
+  }
+}
+
+function validateOptionalReasoningEffort(variables, name, expected) {
+  if (expected ? variables[name] !== expected : Object.hasOwn(variables, name)) {
+    throw new Error(`${name} must ${expected ? 'match the configured value' : 'be unset'}.`);
   }
 }
 

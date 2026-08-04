@@ -22,16 +22,18 @@ const CONFIG = {
     return 'git@github.com:dymoo/example.git';
   },
   execute(_file, args) {
-    if (args[0] === 'variable' && args[1] === 'get') {
-      return {
-        LLM_BASE_URL: 'https://provider.example/v1',
-        LLM_MODEL: 'provider/reviewer',
-        SHIPYARD_CODER_LOW_COMPLEXITY_MODEL: 'provider/low',
-        SHIPYARD_CODER_HIGH_COMPLEXITY_MODEL: 'provider/high',
-        SHIPYARD_CODER_LOW_COMPLEXITY_REASONING_EFFORT: 'xhigh',
-        SHIPYARD_CODER_HIGH_COMPLEXITY_REASONING_EFFORT: 'xhigh',
-        SHIPYARD_CODER_READY: 'false',
-      }[args[2]];
+    if (args[0] === 'variable' && args[1] === 'list') {
+      return JSON.stringify(
+        Object.entries({
+          LLM_BASE_URL: 'https://provider.example/v1',
+          LLM_MODEL: 'provider/reviewer',
+          SHIPYARD_CODER_LOW_COMPLEXITY_MODEL: 'provider/low',
+          SHIPYARD_CODER_HIGH_COMPLEXITY_MODEL: 'provider/high',
+          SHIPYARD_CODER_LOW_COMPLEXITY_REASONING_EFFORT: 'xhigh',
+          SHIPYARD_CODER_HIGH_COMPLEXITY_REASONING_EFFORT: 'xhigh',
+          SHIPYARD_CODER_READY: 'false',
+        }).map(([name, value]) => ({ name, value })),
+      );
     }
     if (args[0] === 'secret' && args[1] === 'list') {
       return JSON.stringify([{ name: 'LLM_API_KEY' }, { name: 'SHIPYARD_HANDOFF_TOKEN' }]);
@@ -129,11 +131,17 @@ test('the setup validator accepts only a guarded installed factory', (t) => {
         root,
         ...CONFIG,
         execute(file, args) {
-          if (args[2] === 'SHIPYARD_CODER_READY') return 'true';
+          if (args[0] === 'variable' && args[1] === 'list') {
+            return CONFIG.execute(file, args).replace('"false"', '"true"');
+          }
           return CONFIG.execute(file, args);
         },
       }),
     /SHIPYARD_CODER_READY must match/i,
+  );
+  assert.throws(
+    () => validateInstalled({ root, ...CONFIG, lowComplexityReasoningEffort: '', highComplexityReasoningEffort: '' }),
+    /SHIPYARD_CODER_LOW_COMPLEXITY_REASONING_EFFORT must be unset/i,
   );
 });
 

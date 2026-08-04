@@ -160,12 +160,7 @@ configured. The validator then verifies their live values as well.
    condition.
 3. Confirm the reviewer still has no checkout, no execution of pull-request
    code, and no model-controlled write path.
-4. Only after the maintainer has confirmed active secret values and all
-   configuration is confirmed, set `SHIPYARD_CODER_READY=true`. Leave it false
-   when any dependency is pending, and clear it before a secret rotation or
-   removal. Do not manufacture a test Issue or apply `ready-for-agent` merely
-   to prove installation.
-5. Run the bundled validator again in `installed` mode with the same values.
+4. Run the bundled validator again in `installed` mode with the same values.
    It accepts only the two complete bundled templates with the confirmed runner,
    secret names and Coder image substituted. This proves the action versions,
    model-Variable wiring, runner labels, permissions, Coder image, Reviewer
@@ -173,6 +168,11 @@ configured. The validator then verifies their live values as well.
    `gh`, it also proves the configured Variables are live, Coder admission is
    still `false`, and the two required secret _names_ exist without reading
    their values. Do not call setup complete unless it passes.
+5. Only after the validator has passed and the maintainer has confirmed active
+   secret values and all configuration is confirmed, set
+   `SHIPYARD_CODER_READY=true`. Leave it false when any dependency is pending,
+   and clear it before a secret rotation or removal. Do not manufacture a test
+   Issue or apply `ready-for-agent` merely to prove installation.
 
 ## Hand off to normal Shipyard operation
 
