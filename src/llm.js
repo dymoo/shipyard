@@ -3,9 +3,11 @@
  *
  * "OpenAI-compatible" is a spectrum: OpenRouter, Ollama, vLLM, Together, Groq
  * and friends all serve /chat/completions but disagree about response_format,
- * temperature. So the client probes: on a 400 naming a parameter it can live
+ * temperature. So the client probes: on a parameter rejection it can live
  * without, it drops that parameter and retries, then remembers for the rest of
- * the run. Completion length is deliberately left to the provider and model.
+ * the run. OpenRouter sometimes reports route-level parameter rejection as a
+ * 404 rather than a 400. Completion length is deliberately left to the provider
+ * and model.
  *
  * Structured output is used when offered but never assumed. A call that passes a
  * `schema` asks for it three ways, strongest first: `json_schema` (the model is
@@ -185,6 +187,17 @@ export class LLM {
   }
 
   #adapt(t) {
+    if (
+      this.quirks.temperature &&
+      this.config.baseUrl === OPENROUTER_BASE_URL &&
+      /no endpoints found that can handle the requested parameters/i.test(t)
+    ) {
+      // OpenRouter's eligible Azure route for Luna omits temperature and reports
+      // that mismatch as a 404. Do not relax tool calling or the ZDR policy.
+      core.warning('OpenRouter route rejected optional temperature — retrying without it.');
+      this.quirks.temperature = false;
+      return true;
+    }
     // Drop json_schema to plain json_object first — many endpoints serve one and
     // not the other. Matched on schema-specific wording so a bare
     // "response_format not supported" falls straight through to the rung below.

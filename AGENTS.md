@@ -241,6 +241,9 @@ Keep the diff to one purpose. If it does two things, it is two pull requests.
 
 ## Changelog
 
+- 2026-08-04: Made the OpenRouter client recognise its parameter-routing 404
+  response and retry without only the optional temperature field; tool calling,
+  ZDR and required-parameter routing remain fixed.
 - 2026-08-04: Completed the finite Cloud Coder/Reviewer loop: one dispatched
   reviewer repair, protected non-force repair commit, then `ready-for-human`
   hand-off by a fixed host-side transition; generated branches skip duplicate
