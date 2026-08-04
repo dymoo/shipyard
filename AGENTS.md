@@ -81,7 +81,11 @@ Cloud Coder's separate public inputs are `api-key`, `base-url`,
 configured low-complexity model and scores 4–5 use the configured
 high-complexity model; reasoning effort is optional and omitted when empty. It
 uses generic tier inputs only in v4; the unchanged v3 tag retains the legacy
-Luna/Terra-named interface for existing callers. It
+Luna/Terra-named interface for existing callers. The Coder workflow requires
+the non-secret `SHIPYARD_CODER_READY` repository Variable to equal `true`
+before it allocates its dedicated runner; operators set it only after its model
+and hand-off secrets exist, and clear it before either secret is removed or
+rotated. It
 triggers from an `issues` label event for `ready-for-agent` or its one trusted
 `shipyard-repair` repository dispatch; it accepts an open Issue rather than a
 PR. The workflow must grant only
@@ -270,6 +274,8 @@ Keep the diff to one purpose. If it does two things, it is two pull requests.
 
 ## Changelog
 
+- 2026-08-04: Added the non-secret `SHIPYARD_CODER_READY` admission gate so a
+  missing Coder secret does not allocate a privileged runner.
 - 2026-08-04: Made Cloud Coder model tiers and reasoning effort repository
   configuration rather than Luna/Terra action defaults. Cloud Coder v4 uses only
   generic tier inputs; the unchanged v3 tag retains the legacy interface.

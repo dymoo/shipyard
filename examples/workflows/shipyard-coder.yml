@@ -18,6 +18,7 @@ concurrency:
 jobs:
   code:
     if: >-
+      vars.SHIPYARD_CODER_READY == 'true' &&
       vars.LLM_BASE_URL != '' &&
       vars.SHIPYARD_CODER_LOW_COMPLEXITY_MODEL != '' &&
       vars.SHIPYARD_CODER_HIGH_COMPLEXITY_MODEL != '' &&

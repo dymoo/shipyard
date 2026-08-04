@@ -204,17 +204,22 @@ environment.
 
 Set these repository **Variables** before enabling the Coder:
 
-| Variable                                          | Purpose                                      |
-| ------------------------------------------------- | -------------------------------------------- |
-| `LLM_BASE_URL`                                    | OpenAI-compatible API base URL.              |
-| `SHIPYARD_CODER_LOW_COMPLEXITY_MODEL`             | Model for Agent Brief complexity scores 1–3. |
-| `SHIPYARD_CODER_HIGH_COMPLEXITY_MODEL`            | Model for Agent Brief complexity scores 4–5. |
-| `SHIPYARD_CODER_LOW_COMPLEXITY_REASONING_EFFORT`  | Optional effort for scores 1–3.              |
-| `SHIPYARD_CODER_HIGH_COMPLEXITY_REASONING_EFFORT` | Optional effort for scores 4–5.              |
-| `LLM_MODEL`                                       | Reviewer model.                              |
+| Variable                                          | Purpose                                            |
+| ------------------------------------------------- | -------------------------------------------------- |
+| `LLM_BASE_URL`                                    | OpenAI-compatible API base URL.                    |
+| `SHIPYARD_CODER_READY`                            | Set to `true` only after both Coder secrets exist. |
+| `SHIPYARD_CODER_LOW_COMPLEXITY_MODEL`             | Model for Agent Brief complexity scores 1–3.       |
+| `SHIPYARD_CODER_HIGH_COMPLEXITY_MODEL`            | Model for Agent Brief complexity scores 4–5.       |
+| `SHIPYARD_CODER_LOW_COMPLEXITY_REASONING_EFFORT`  | Optional effort for scores 1–3.                    |
+| `SHIPYARD_CODER_HIGH_COMPLEXITY_REASONING_EFFORT` | Optional effort for scores 4–5.                    |
+| `LLM_MODEL`                                       | Reviewer model.                                    |
 
 The two model variables are required. Leave either reasoning-effort variable
-empty when its provider does not support that parameter.
+empty when its provider does not support that parameter. Set
+`SHIPYARD_CODER_READY` to `true` only after you create both `LLM_API_KEY` and
+`SHIPYARD_HANDOFF_TOKEN`; set it to any other value before removing or rotating
+either secret. This makes the workflow skip before allocating the dedicated
+runner when the factory is not ready.
 
 Cloud Coder v4 has no model defaults or model-branded inputs. Configure the two
 generic tier Variables above; existing v3 installations remain available at

@@ -47,6 +47,7 @@ test('the Shipyard pilot workflow routes only ready Issues through a pinned Node
   assert.match(workflow, /github\.event\.label\.name == 'ready-for-agent'/);
   assert.match(workflow, /github\.event\.issue\.state == 'open'/);
   assert.match(workflow, /github\.event\.action == 'shipyard-repair'/);
+  assert.match(workflow, /vars\.SHIPYARD_CODER_READY == 'true'/);
   assert.match(workflow, /low-complexity-model: \$\{\{ vars\.SHIPYARD_CODER_LOW_COMPLEXITY_MODEL \}\}/);
   assert.match(workflow, /high-complexity-model: \$\{\{ vars\.SHIPYARD_CODER_HIGH_COMPLEXITY_MODEL \}\}/);
   assert.match(workflow, /runs-on: shipyard-runners/);
@@ -54,6 +55,7 @@ test('the Shipyard pilot workflow routes only ready Issues through a pinned Node
   assert.match(workflow, /handoff-token: \$\{\{ secrets\.SHIPYARD_HANDOFF_TOKEN \}\}/);
 
   const example = fs.readFileSync(new URL('../examples/workflows/shipyard-coder.yml', import.meta.url), 'utf8');
+  assert.match(example, /vars\.SHIPYARD_CODER_READY == 'true'/);
   assert.match(example, /vars\.LLM_BASE_URL != ''/);
   assert.match(example, /vars\.SHIPYARD_CODER_LOW_COMPLEXITY_MODEL != ''/);
   assert.match(example, /vars\.SHIPYARD_CODER_HIGH_COMPLEXITY_MODEL != ''/);
