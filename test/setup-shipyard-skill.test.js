@@ -24,6 +24,7 @@ test('the setup skill installs only explicit, guarded Shipyard contracts', () =>
   assert.match(skill, /Do not print, write, or request secret values/i);
   assert.match(skill, /replace\s+`secrets\.LLM_API_KEY` and\s+`secrets\.SHIPYARD_HANDOFF_TOKEN`/i);
   assert.match(skill, /same hand-off secret name/i);
+  assert.match(skill, /Confirm both Coder and Reviewer use the confirmed dedicated runner\s+label/i);
   assert.match(skill, /Do not manufacture a test\s+Issue or apply `ready-for-agent`/i);
   assert.match(skill, /Merge this focused section into the target repository's root `AGENTS\.md`/);
 });

@@ -125,8 +125,9 @@ workflow file, repository Variable, model prompt, or command output.
 1. Review the complete workflow and `AGENTS.md` diff. Run the target
    repository's normal formatting, lint, type and test checks when they exist.
 2. With `gh`, verify workflow files are present; list Variables and secret names
-   only. Confirm the Coder workflow uses a dedicated runner label, a real
-   digest, and the `SHIPYARD_CODER_READY == 'true'` admission condition.
+   only. Confirm both Coder and Reviewer use the confirmed dedicated runner
+   label. Confirm Coder also uses a real digest and the
+   `SHIPYARD_CODER_READY == 'true'` admission condition.
 3. Confirm the reviewer still has no checkout, no execution of pull-request
    code, and no model-controlled write path.
 4. Only after all configuration is confirmed, set `SHIPYARD_CODER_READY=true`.
