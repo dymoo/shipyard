@@ -203,6 +203,9 @@ async function main() {
     body: commentBody(finding, finding.anchor),
   }));
   await postInline(gh, ctx, currentPr, comments);
+  // GitHub binds inline comments to currentPr.head.sha. Recheck before the
+  // unversioned sticky summary so a newer head receives no old review output.
+  await refreshCloudCoderPull(gh, ctx, currentPr);
   await upsertSummary(gh, ctx, summary, issueComments);
   await handoffCloudCoder(gh, ctx, currentPr, config, fresh.length);
   setOutputs(true, findings.length);

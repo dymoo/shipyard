@@ -125,7 +125,7 @@ export function readIssueEvent(handoffToken = '') {
         payload.client_payload?.handoff_proof,
       )
     ) {
-      return { owner, repo, skip: 'repair dispatch did not include a valid Shipyard hand-off proof' };
+      throw new Error('Shipyard repair dispatch requires a valid hand-off token and proof.');
     }
     return { owner, repo, issueNumber, pullNumber, repairRound, headSha };
   }

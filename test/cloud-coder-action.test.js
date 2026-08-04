@@ -84,7 +84,7 @@ test('dispatches only when ready-for-agent labels an Issue', (t) => {
       client_payload: { ...repairDispatch().client_payload, handoff_proof: 'forged' },
     }),
   );
-  assert.match(readIssueEvent('handoff-secret').skip, /hand-off proof/i);
+  assert.throws(() => readIssueEvent('handoff-secret'), /requires a valid hand-off token and proof/i);
 
   fs.writeFileSync(eventPath, JSON.stringify(repairDispatch({ repair_round: 2 })));
   assert.match(readIssueEvent('handoff-secret').skip, /expected Issue, PR, commit, and round/i);

@@ -490,6 +490,25 @@ test('a head change during review cannot mark a newer commit ready', async (t) =
   assert.deepEqual(captured.labels, []);
 });
 
+test('a head change after a bound inline review cannot post a summary or hand-off', async (t) => {
+  const { server, captured, port } = await stubServer({ pullHeads: ['headsha', 'headsha', 'new-head'] });
+  t.after(() => server.close());
+
+  const run = await runAction(port, {
+    GITHUB_EVENT_NAME: 'repository_dispatch',
+    __event: coderReviewDispatch(1),
+  });
+  assert.notEqual(run.code, 0);
+  assert.match(`${run.stdout}\n${run.stderr}`, /no longer matches the pull request head/);
+  assert.equal(captured.reviews.length, 1);
+  assert.equal(captured.reviews[0].commit_id, 'headsha');
+  assert.deepEqual(captured.createdComments, []);
+  assert.deepEqual(captured.updatedComments, []);
+  assert.deepEqual(captured.dispatchedEvents, []);
+  assert.deepEqual(captured.updatedPulls, []);
+  assert.deepEqual(captured.labels, []);
+});
+
 test('the investigation can read repository evidence with tools', async (t) => {
   const { server, captured, port } = await stubServer({
     llmReply: (body) => {
