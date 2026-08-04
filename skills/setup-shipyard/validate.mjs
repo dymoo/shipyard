@@ -7,6 +7,7 @@ const SECRET_NAME = /^[A-Z][A-Z0-9_]*$/;
 const RUNNER_LABEL = /^[A-Za-z0-9_.-]+$/;
 const IMAGE_DIGEST = /^[\w./:-]+@sha256:[a-f0-9]{64}$/;
 const REPOSITORY = /^[\w.-]+\/[\w.-]+$/;
+const DEDICATED_RUNNER = /^shipyard-[A-Za-z0-9_.-]+$/;
 const GITHUB_HOSTED_RUNNERS = new Set([
   'ubuntu-latest',
   'ubuntu-24.04',
@@ -35,15 +36,21 @@ const OPTIONS = new Set([
   '--reviewer-model',
   '--low-complexity-model',
   '--high-complexity-model',
+  '--low-complexity-reasoning-effort',
+  '--high-complexity-reasoning-effort',
 ]);
 
 export function validatePreflight(config) {
   requiredDirectory(config.root, 'Repository root');
   if (!REPOSITORY.test(config.repository)) throw new Error('Repository must be in owner/repository form.');
+  if (localRepository(config) !== config.repository) {
+    throw new Error('--repository must match the local origin remote.');
+  }
   if (
     !RUNNER_LABEL.test(config.runnerLabel) ||
     config.runnerLabel === 'self-hosted' ||
-    GITHUB_HOSTED_RUNNERS.has(config.runnerLabel)
+    GITHUB_HOSTED_RUNNERS.has(config.runnerLabel) ||
+    !DEDICATED_RUNNER.test(config.runnerLabel)
   ) {
     throw new Error('Runner label must be a dedicated GitHub label, never "self-hosted".');
   }
@@ -143,6 +150,12 @@ function validateLiveConfiguration(config) {
     SHIPYARD_CODER_HIGH_COMPLEXITY_MODEL: config.highComplexityModel,
     SHIPYARD_CODER_READY: 'false',
   };
+  if (config.lowComplexityReasoningEffort) {
+    expectedVariables.SHIPYARD_CODER_LOW_COMPLEXITY_REASONING_EFFORT = config.lowComplexityReasoningEffort;
+  }
+  if (config.highComplexityReasoningEffort) {
+    expectedVariables.SHIPYARD_CODER_HIGH_COMPLEXITY_REASONING_EFFORT = config.highComplexityReasoningEffort;
+  }
   for (const [name, expected] of Object.entries(expectedVariables)) {
     if (runGh(config, ['variable', 'get', name, '--repo', config.repository]) !== expected) {
       throw new Error(`${name} must match the confirmed pre-enable configuration.`);
@@ -163,6 +176,22 @@ function runGh(config, args) {
   } catch (error) {
     throw new Error('Could not inspect live repository configuration with gh.', { cause: error });
   }
+}
+
+function localRepository(config) {
+  let remote;
+  try {
+    remote = (config.readRemote ?? readOrigin)(config.root).trim();
+  } catch (error) {
+    throw new Error('Could not read the local origin remote.', { cause: error });
+  }
+  const match = /github\.com[:/]([\w.-]+\/[\w.-]+?)(?:\.git)?$/.exec(remote);
+  if (!match) throw new Error('Local origin remote must point to a GitHub owner/repository.');
+  return match[1];
+}
+
+function readOrigin(root) {
+  return execFileSync('git', ['-C', root, 'config', '--get', 'remote.origin.url'], { encoding: 'utf8' });
 }
 
 function parseArguments(args) {
@@ -187,6 +216,8 @@ function parseArguments(args) {
     reviewerModel: values['--reviewer-model'],
     lowComplexityModel: values['--low-complexity-model'],
     highComplexityModel: values['--high-complexity-model'],
+    lowComplexityReasoningEffort: values['--low-complexity-reasoning-effort'],
+    highComplexityReasoningEffort: values['--high-complexity-reasoning-effort'],
   };
   return { mode, config };
 }

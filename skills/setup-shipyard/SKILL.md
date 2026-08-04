@@ -38,8 +38,9 @@ Confirm that GitHub Actions is the intended execution platform.
 Collect these values from existing repository configuration or ask the user;
 never invent them:
 
-- a **dedicated** self-hosted runner label with Docker, such as an ARC scale-set
-  release name; never fall back to the broad `self-hosted` label;
+- a **dedicated** self-hosted runner label with Docker whose name begins
+  `shipyard-`, such as an ARC scale-set release name; never fall back to the
+  broad `self-hosted` label;
 - the OpenAI-compatible API base URL, reviewer model, low-tier Coder model and
   high-tier Coder model;
 - the optional reasoning effort for each Coder tier;
@@ -59,11 +60,15 @@ repository file changes:
 
 ```text
 node /path/to/setup-shipyard/validate.mjs --mode preflight --root /path/to/repo --repository owner/repo \
-  --runner-label dedicated-runner --model-secret LLM_API_KEY \
+  --runner-label shipyard-runners --model-secret LLM_API_KEY \
   --handoff-secret SHIPYARD_HANDOFF_TOKEN --sandbox-image registry/image@sha256:<64-lowercase-hex> \
   --base-url https://provider.example/v1 --reviewer-model provider/reviewer \
   --low-complexity-model provider/low --high-complexity-model provider/high
 ```
+
+Append `--low-complexity-reasoning-effort` and
+`--high-complexity-reasoning-effort` only when those optional Variables are
+configured. The validator then verifies their live values as well.
 
 ## Install the factory
 

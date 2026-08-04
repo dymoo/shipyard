@@ -16,6 +16,11 @@ const CONFIG = {
   reviewerModel: 'provider/reviewer',
   lowComplexityModel: 'provider/low',
   highComplexityModel: 'provider/high',
+  lowComplexityReasoningEffort: 'xhigh',
+  highComplexityReasoningEffort: 'xhigh',
+  readRemote() {
+    return 'git@github.com:dymoo/example.git';
+  },
   execute(_file, args) {
     if (args[0] === 'variable' && args[1] === 'get') {
       return {
@@ -23,6 +28,8 @@ const CONFIG = {
         LLM_MODEL: 'provider/reviewer',
         SHIPYARD_CODER_LOW_COMPLEXITY_MODEL: 'provider/low',
         SHIPYARD_CODER_HIGH_COMPLEXITY_MODEL: 'provider/high',
+        SHIPYARD_CODER_LOW_COMPLEXITY_REASONING_EFFORT: 'xhigh',
+        SHIPYARD_CODER_HIGH_COMPLEXITY_REASONING_EFFORT: 'xhigh',
         SHIPYARD_CODER_READY: 'false',
       }[args[2]];
     }
@@ -69,7 +76,7 @@ test('the setup skill installs only explicit, guarded Shipyard contracts', () =>
 
   assert.match(skill, /dymoo\/shipyard@v3/);
   assert.match(skill, /dymoo\/shipyard\/cloud-coder@v4/);
-  assert.match(skill, /never fall back to the broad `self-hosted` label/i);
+  assert.match(skill, /never fall back to the\s+broad `self-hosted` label/i);
   assert.match(skill, /SHA-256 digest-pinned Docker image/i);
   assert.match(skill, /SHIPYARD_CODER_READY=false/);
   assert.match(skill, /Do not enable Coder.*SHIPYARD_CODER_READY=true/is);
@@ -95,8 +102,10 @@ test('the setup validator rejects unsafe inputs before workflow edits', (t) => {
   assert.doesNotThrow(() => validatePreflight({ root, ...CONFIG }));
   assert.throws(() => validatePreflight({ root, ...CONFIG, runnerLabel: 'self-hosted' }), /dedicated GitHub label/i);
   assert.throws(() => validatePreflight({ root, ...CONFIG, runnerLabel: 'ubuntu-latest' }), /dedicated GitHub label/i);
+  assert.throws(() => validatePreflight({ root, ...CONFIG, runnerLabel: 'linux' }), /dedicated GitHub label/i);
   assert.throws(() => validatePreflight({ root, ...CONFIG, sandboxImage: 'node:20' }), /SHA-256 digest/i);
   assert.throws(() => validatePreflight({ root, ...CONFIG, handoffSecret: CONFIG.modelSecret }), /different names/i);
+  assert.throws(() => validatePreflight({ root, ...CONFIG, repository: 'dymoo/other' }), /local origin remote/i);
 });
 
 test('the setup validator accepts only a guarded installed factory', (t) => {
@@ -173,6 +182,10 @@ test('the setup validator refuses unknown command options', (t) => {
     CONFIG.lowComplexityModel,
     '--high-complexity-model',
     CONFIG.highComplexityModel,
+    '--low-complexity-reasoning-effort',
+    CONFIG.lowComplexityReasoningEffort,
+    '--high-complexity-reasoning-effort',
+    CONFIG.highComplexityReasoningEffort,
     '--runner-lable',
     CONFIG.runnerLabel,
   ]);

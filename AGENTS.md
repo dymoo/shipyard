@@ -284,7 +284,8 @@ Keep the diff to one purpose. If it does two things, it is two pull requests.
 - 2026-08-04: Added the `setup-shipyard` local bootstrap skill. It verifies
   Matt's real workflows before configuring guarded Shipyard Actions and the
   target repository's agent contract, with preflight, exact canonical
-  installed-state validation, and a live pre-enable `gh` configuration check.
+  installed-state validation, a live pre-enable `gh` configuration check, a
+  dedicated `shipyard-*` runner label, and an origin-remote repository check.
 - 2026-08-04: Added the non-secret `SHIPYARD_CODER_READY` admission gate so a
   missing Coder secret does not allocate a privileged runner.
 - 2026-08-04: Made Cloud Coder model tiers and reasoning effort repository
