@@ -37,5 +37,5 @@ jobs:
         with:
           api-key: ${{ secrets.LLM_API_KEY }}
           base-url: ${{ vars.LLM_BASE_URL }}
-          model: ${{ vars.SHIPYARD_REVIEW_MODEL }}
+          model: ${{ vars.LLM_MODEL }}
           handoff-token: ${{ secrets.SHIPYARD_HANDOFF_TOKEN }}

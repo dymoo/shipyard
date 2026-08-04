@@ -21,6 +21,7 @@ jobs:
       (github.event_name == 'issues' &&
        github.event.action == 'labeled' &&
        github.event.label.name == 'ready-for-agent' &&
+       github.event.issue.state == 'open' &&
        !github.event.issue.pull_request) ||
       (github.event_name == 'repository_dispatch' && github.event.action == 'shipyard-repair')
     runs-on: shipyard-runners

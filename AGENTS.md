@@ -108,9 +108,9 @@ its configured HMAC token/proof fails visibly.
 Shipyard's own pilot Coder workflow is `.github/workflows/shipyard-coder.yml`.
 It reads its low/high model tiers and optional reasoning efforts from repository
 Variables, plus the shared hand-off secret and digest-pinned Node 20 sandbox
-image. Its only supported pilot test command is `npm test`; a consumer that
-needs package binaries must publish a test-toolchain image and pass that image's
-immutable digest instead. Cloud Coder and Cloud Reviewer run on the ARC
+image. Shipyard's pilot Agent Briefs use `npm test`; a consumer whose Brief
+declares another command must publish a test-toolchain image and pass that
+image's immutable digest instead. Cloud Coder and Cloud Reviewer run on the ARC
 release-name label `shipyard-runners`. That runner is dedicated,
 repository-scoped infrastructure with Docker; it receives model and GitHub
 credentials and must not be shared with unrelated untrusted workloads. Ordinary

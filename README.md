@@ -118,11 +118,11 @@ jobs:
         with:
           api-key: ${{ secrets.LLM_API_KEY }}
           base-url: ${{ vars.LLM_BASE_URL }}
-          model: ${{ vars.SHIPYARD_REVIEW_MODEL }}
+          model: ${{ vars.LLM_MODEL }}
           handoff-token: ${{ secrets.SHIPYARD_HANDOFF_TOKEN }}
 ```
 
-Add `OPENAI_API_KEY` and a random `SHIPYARD_HANDOFF_TOKEN` under **Settings →
+Add `LLM_API_KEY` and a random `SHIPYARD_HANDOFF_TOKEN` under **Settings →
 Secrets and variables → Actions**. The reviewer needs an OpenAI-compatible Chat
 Completions endpoint with tool calling. It is API-key-only; a ChatGPT or Codex
 subscription is not a GitHub Actions credential. Coder/Reviewer repository
@@ -210,7 +210,7 @@ Set these repository **Variables** before enabling the Coder:
 | `SHIPYARD_CODER_HIGH_COMPLEXITY_MODEL`            | Model for Agent Brief complexity scores 4–5. |
 | `SHIPYARD_CODER_LOW_COMPLEXITY_REASONING_EFFORT`  | Optional effort for scores 1–3.              |
 | `SHIPYARD_CODER_HIGH_COMPLEXITY_REASONING_EFFORT` | Optional effort for scores 4–5.              |
-| `SHIPYARD_REVIEW_MODEL`                           | Reviewer model.                              |
+| `LLM_MODEL`                                       | Reviewer model.                              |
 
 The two model variables are required. Leave either reasoning-effort variable
 empty when its provider does not support that parameter.
@@ -219,10 +219,10 @@ empty when its provider does not support that parameter.
 deprecated aliases with no model defaults. Use the generic tier inputs above;
 the aliases will be removed only in the next major version.
 
-This repository's own pilot workflow uses the official digest-pinned Node 20
-image and `npm test`, because its test command uses only Node's built-in test
-runner. A consumer whose test command needs package binaries or another runtime
-must publish an image containing that toolchain and use its immutable digest.
+This repository's own pilot Agent Briefs use the official digest-pinned Node 20
+image and `npm test`, because that command uses only Node's built-in test
+runner. A consumer whose Agent Brief declares another test command must publish
+an image containing that toolchain and use its immutable digest.
 
 Use `dymoo/shipyard/cloud-coder@v3` in the copied workflow. Both actions must
 receive the same `SHIPYARD_HANDOFF_TOKEN`; Shipyard uses it only to sign and
