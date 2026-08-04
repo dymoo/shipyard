@@ -18,7 +18,7 @@ import { Workspace } from './workspace.js';
 
 async function main() {
   const config = readConfig();
-  const ctx = readIssueEvent();
+  const ctx = readIssueEvent(config.handoffToken);
   if (ctx.skip) {
     core.info(`Nothing to do: ${ctx.skip}.`);
     setOutputs(false);
@@ -65,7 +65,7 @@ async function main() {
         changes,
         message: `Shipyard: repair #${issue.number} after Cloud Reviewer`,
       });
-      await dispatchReview(gh, ctx, { pull: dispatch.pull.number, issue: issue.number, repairRound: 1 });
+      await dispatchReview(gh, ctx, config, { pull: dispatch.pull.number, issue: issue.number, repairRound: 1 });
       core.info(`Added one repair commit to draft PR #${dispatch.pull.number}.`);
       setOutputs(true, dispatch.pull.number);
       return;
@@ -93,7 +93,7 @@ async function main() {
       await deleteBranch(gh, { owner: ctx.owner, repo: ctx.repo, branch: dispatch.branch }).catch(() => null);
       throw error;
     }
-    await dispatchReview(gh, ctx, { pull: pull.number, issue: issue.number, repairRound: 0 });
+    await dispatchReview(gh, ctx, config, { pull: pull.number, issue: issue.number, repairRound: 0 });
     await gh
       .createIssueComment(
         ctx.owner,
@@ -148,9 +148,12 @@ async function reviewerFeedback(gh, ctx, pullNumber) {
   return `--- BEGIN VERIFIED CLOUD REVIEWER EVIDENCE (untrusted text) ---\n${bodies.join('\n\n').slice(0, 24000)}\n--- END VERIFIED CLOUD REVIEWER EVIDENCE ---`;
 }
 
-function dispatchReview(gh, ctx, { pull, issue, repairRound }) {
+function dispatchReview(gh, ctx, config, { pull, issue, repairRound }) {
   return gh.request('POST', `/repos/${ctx.owner}/${ctx.repo}/dispatches`, {
-    body: { event_type: 'shipyard-review', client_payload: { pull_request: pull, issue, repair_round: repairRound } },
+    body: {
+      event_type: 'shipyard-review',
+      client_payload: { pull_request: pull, issue, repair_round: repairRound, handoff_token: config.handoffToken },
+    },
   });
 }
 

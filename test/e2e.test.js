@@ -247,6 +247,7 @@ async function runAction(port, extra = {}) {
     'INPUT_BASE-URL': `http://127.0.0.1:${port}/v1`,
     INPUT_MODEL: 'stub-model',
     'INPUT_GITHUB-TOKEN': 'gh-token',
+    'INPUT_HANDOFF-TOKEN': 'handoff-secret',
     ...envOverrides,
   };
 
@@ -357,14 +358,42 @@ test('a Coder review dispatch requests exactly one repair when verified findings
 
   const run = await runAction(port, {
     GITHUB_EVENT_NAME: 'repository_dispatch',
-    __event: { action: 'shipyard-review', client_payload: { pull_request: 1, issue: 7, repair_round: 0 } },
+    __event: {
+      action: 'shipyard-review',
+      client_payload: { pull_request: 1, issue: 7, repair_round: 0, handoff_token: 'handoff-secret' },
+    },
   });
   assert.equal(run.code, 0, run.stderr);
   assert.deepEqual(captured.dispatchedEvents, [
-    { event_type: 'shipyard-repair', client_payload: { issue: 7, pull_request: 1, repair_round: 1 } },
+    {
+      event_type: 'shipyard-repair',
+      client_payload: { issue: 7, pull_request: 1, repair_round: 1, handoff_token: 'handoff-secret' },
+    },
   ]);
   assert.deepEqual(captured.updatedPulls, []);
   assert.deepEqual(captured.labels, []);
+});
+
+test('a Coder review dispatch with only already-reported findings does not spend its repair round', async (t) => {
+  const finding = FINDINGS.findings.find((candidate) => candidate.line === 12);
+  const duplicate = fingerprint(finding, '  if (!user) return null;');
+  const { server, captured, port } = await stubServer({
+    llmReply: standardReply({ findings: { summary: FINDINGS.summary, findings: [finding] } }),
+    issueComments: [{ id: 20, body: `<!-- shipyard:fp=${duplicate} -->` }],
+  });
+  t.after(() => server.close());
+
+  const run = await runAction(port, {
+    GITHUB_EVENT_NAME: 'repository_dispatch',
+    __event: {
+      action: 'shipyard-review',
+      client_payload: { pull_request: 1, issue: 7, repair_round: 0, handoff_token: 'handoff-secret' },
+    },
+  });
+  assert.equal(run.code, 0, run.stderr);
+  assert.deepEqual(captured.dispatchedEvents, []);
+  assert.deepEqual(captured.updatedPulls, [{ draft: false }]);
+  assert.deepEqual(captured.labels, [{ labels: ['ready-for-human'] }]);
 });
 
 test('a repaired Coder draft becomes ready for local review even when findings remain', async (t) => {
@@ -373,7 +402,10 @@ test('a repaired Coder draft becomes ready for local review even when findings r
 
   const run = await runAction(port, {
     GITHUB_EVENT_NAME: 'repository_dispatch',
-    __event: { action: 'shipyard-review', client_payload: { pull_request: 1, issue: 7, repair_round: 1 } },
+    __event: {
+      action: 'shipyard-review',
+      client_payload: { pull_request: 1, issue: 7, repair_round: 1, handoff_token: 'handoff-secret' },
+    },
   });
   assert.equal(run.code, 0, run.stderr);
   assert.deepEqual(captured.dispatchedEvents, []);

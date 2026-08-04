@@ -62,7 +62,7 @@ Ponytail. Planning skills stay in the local coding session and are never loaded
 by the cloud executor.
 
 The review action's public inputs are exactly `api-key`, `base-url`, `model`,
-`github-token`, `instructions` and `ignore`. The source-free OpenRouter
+`github-token`, `handoff-token`, `instructions` and `ignore`. The source-free OpenRouter
 preflight has a separate exact interface: `api-key`, `required-models`, `model`,
 `key-limit-usd`, `key-limit-reset` and `diagnostic-provider`. Authentication is
 API-key-only. ChatGPT subscription OAuth is deferred in
@@ -70,7 +70,7 @@ API-key-only. ChatGPT subscription OAuth is deferred in
 
 Cloud Coder's separate public inputs are `api-key`, `base-url`, `luna-model`,
 `terra-model`, `luna-reasoning-effort`, `terra-reasoning-effort`,
-`github-token` and `sandbox-image`. Scores 1–3 use Luna and scores 4–5 use
+`github-token`, `handoff-token` and `sandbox-image`. Scores 1–3 use Luna and scores 4–5 use
 Terra; both default to `xhigh`. It triggers from an `issues` label event for
 `ready-for-agent` or its one trusted `shipyard-repair` repository dispatch; it
 accepts an open Issue rather than a PR. The workflow must grant only
@@ -81,7 +81,9 @@ SHA-256 digest-pinned test image with a fixed job timeout. The Coder's host-side
 after the fixed Agent Brief test command passes in a no-network container.
 It then emits the `shipyard-review` repository-dispatch event; the separate
 Cloud Reviewer workflow must listen for that event so it runs with its own
-configured model and API key. For Coder-dispatched reviews only, the review
+configured model and API key. Both actions require the same masked handoff token
+in that dispatch payload; it is compared before either hand-off is accepted and
+never reaches a model. For Coder-dispatched reviews only, the review
 host either emits one `shipyard-repair` event with bot-authored, verified
 findings or changes the Coder draft to ready-for-review and applies
 `ready-for-human`; it never lets the review model invoke GitHub mutations. The
@@ -109,7 +111,8 @@ it needs splitting.
 | File              | Owns                                                                     |
 | ----------------- | ------------------------------------------------------------------------ |
 | `src/index.js`    | Orchestration. No business logic.                                        |
-| `src/config.js`   | Six inputs, fixed limits and event resolution                            |
+| `src/config.js`   | Seven inputs, fixed limits and event resolution                          |
+| `src/handoff.js`  | Constant-time Coder/Reviewer dispatch-token comparison                   |
 | `src/prompts.js`  | Every prompt. The product's actual IP.                                   |
 | `src/schema.js`   | JSON Schemas for structured replies. Authoritative.                      |
 | `src/review.js`   | The model passes: find and refute                                        |
@@ -241,6 +244,10 @@ Keep the diff to one purpose. If it does two things, it is two pull requests.
 
 ## Changelog
 
+- 2026-08-04: Authenticated Coder/Reviewer repository-dispatch hand-offs with
+  a shared masked token, prevented duplicate findings from spending the repair
+  round, and added regression coverage for direct symlink reads and advertised
+  skill metadata.
 - 2026-08-04: Hardened Cloud Coder publication and hand-off: verify the base
   ref immediately before creating its branch, preserve regular-file mode, fail
   reviewer-dispatch errors visibly, mask Coder keys immediately, and exercise

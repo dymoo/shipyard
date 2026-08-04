@@ -37,6 +37,7 @@ jobs:
           api-key: ${{ secrets.LLM_API_KEY }}
           base-url: ${{ vars.LLM_BASE_URL }}
           model: ${{ vars.LLM_MODEL }}
+          handoff-token: ${{ secrets.SHIPYARD_HANDOFF_TOKEN }}
           instructions: |
             This action has no runtime dependencies. Any import that is not
             from node: or a relative src/ path is a finding.

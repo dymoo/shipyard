@@ -20,6 +20,10 @@ inputs:
     description: Token used to read the pull request and post comments.
     required: false
     default: ${{ github.token }}
+  handoff-token:
+    description: Shared secret that authenticates Cloud Coder and Cloud Reviewer dispatches.
+    required: false
+    default: ''
   instructions:
     description: Extra repository-specific review guidance.
     required: false

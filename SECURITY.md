@@ -14,7 +14,9 @@ no repository content.
 
 **Credentials.** Model and GitHub keys are masked immediately. The reviewer key
 is sent only to `base-url`; the preflight key only to OpenRouter. There is no
-default or fallback model endpoint.
+default or fallback model endpoint. Cloud Coder and Cloud Reviewer also share a
+random masked handoff token. It is carried only in their GitHub dispatch payload,
+checked before either action accepts a hand-off, and never enters model context.
 
 **OpenRouter routing.** When `base-url` is exactly
 `https://openrouter.ai/api/v1`, every request requires an endpoint with data
@@ -45,8 +47,10 @@ Posted model prose has reserved Shipyard markers and user mentions neutralised.
 
 **Who can spend the key.** Pull-request events can run automatically. The
 `@shipyard` comment trigger is limited to repository owners, members and
-collaborators. The required permissions are `contents: read` and
-`pull-requests: write`; the reviewer never pushes, approves or requests changes.
+collaborators. A standard review needs `contents: read` and `pull-requests:
+write`; the Coder hand-off workflow additionally needs `contents: write` and
+`issues: write` for its fixed, token-authenticated repair transition. The
+reviewer never pushes, approves or requests changes.
 
 ## Supply chain
 

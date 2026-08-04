@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import * as core from './core.js';
+import { matchesHandoffToken } from './handoff.js';
 
 export const SEVERITIES = ['critical', 'high', 'medium', 'low'];
 export const VERDICT_REAL = 'real';
@@ -72,6 +73,8 @@ export function readConfig() {
 
   const githubToken = requiredInput('github-token');
   core.mask(githubToken);
+  const handoffToken = core.getInput('handoff-token');
+  if (handoffToken) core.mask(handoffToken);
 
   const baseUrl = requiredHttpUrl('base-url', requiredInput('base-url'));
   const model = requiredInput('model');
@@ -82,6 +85,7 @@ export function readConfig() {
     baseUrl,
     model,
     githubToken,
+    handoffToken,
     githubApiUrl,
     instructions: core.getInput('instructions'),
     ignore: [...DEFAULT_IGNORES, ...core.getLines('ignore')],
@@ -134,7 +138,7 @@ function requiredHttpUrl(name, value) {
  * Resolve the pull request and apply the fixed comment-trigger author gate.
  * @returns {EventContext}
  */
-export function readEvent() {
+export function readEvent(handoffToken = '') {
   const [owner, repo] = requiredEnv('GITHUB_REPOSITORY').split('/');
   if (!owner || !repo) throw new Error('GITHUB_REPOSITORY must be in owner/repository form.');
 
@@ -169,6 +173,9 @@ export function readEvent() {
   if (eventName === 'repository_dispatch') {
     if (payload.action !== 'shipyard-review')
       return { ...base, skip: 'repository dispatch is not for Shipyard review' };
+    if (!matchesHandoffToken(payload.client_payload?.handoff_token, handoffToken)) {
+      return { ...base, skip: 'repository dispatch did not include the Cloud Coder handoff token' };
+    }
     const prNumber = payload.client_payload?.pull_request;
     if (!Number.isInteger(prNumber) || prNumber < 1) {
       return { ...base, skip: 'repository dispatch did not include a pull request number' };

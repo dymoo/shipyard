@@ -13,6 +13,7 @@ test('Cloud Coder action declares the bounded implementation contract', () => {
   assert.match(action, /terra-model:/);
   assert.match(action, /luna-reasoning-effort:/);
   assert.match(action, /terra-reasoning-effort:/);
+  assert.match(action, /handoff-token:/);
   assert.match(action, /default: gpt-5\.6-luna/);
   assert.match(action, /default: gpt-5\.6-terra/);
   assert.match(action, /main: src\/index\.js/);
@@ -40,21 +41,42 @@ test('dispatches only when ready-for-agent labels an Issue', (t) => {
     eventPath,
     JSON.stringify({ action: 'labeled', label: { name: 'ready-for-agent' }, issue: { number: 7 } }),
   );
-  assert.deepEqual(readIssueEvent(), { owner: 'o', repo: 'r', issueNumber: 7 });
+  assert.deepEqual(readIssueEvent('trusted-handoff'), { owner: 'o', repo: 'r', issueNumber: 7 });
 
   fs.writeFileSync(eventPath, JSON.stringify({ action: 'labeled', label: { name: 'bug' }, issue: { number: 7 } }));
-  assert.match(readIssueEvent().skip, /ready-for-agent/i);
+  assert.match(readIssueEvent('trusted-handoff').skip, /ready-for-agent/i);
 
   process.env.GITHUB_EVENT_NAME = 'repository_dispatch';
   fs.writeFileSync(
     eventPath,
-    JSON.stringify({ action: 'shipyard-repair', client_payload: { issue: 7, pull_request: 12, repair_round: 1 } }),
+    JSON.stringify({
+      action: 'shipyard-repair',
+      client_payload: { issue: 7, pull_request: 12, repair_round: 1, handoff_token: 'trusted-handoff' },
+    }),
   );
-  assert.deepEqual(readIssueEvent(), { owner: 'o', repo: 'r', issueNumber: 7, pullNumber: 12, repairRound: 1 });
+  assert.deepEqual(readIssueEvent('trusted-handoff'), {
+    owner: 'o',
+    repo: 'r',
+    issueNumber: 7,
+    pullNumber: 12,
+    repairRound: 1,
+  });
 
   fs.writeFileSync(
     eventPath,
-    JSON.stringify({ action: 'shipyard-repair', client_payload: { issue: 7, pull_request: 12, repair_round: 2 } }),
+    JSON.stringify({
+      action: 'shipyard-repair',
+      client_payload: { issue: 7, pull_request: 12, repair_round: 1, handoff_token: 'wrong' },
+    }),
   );
-  assert.match(readIssueEvent().skip, /expected Issue, PR, and round/i);
+  assert.match(readIssueEvent('trusted-handoff').skip, /handoff token/i);
+
+  fs.writeFileSync(
+    eventPath,
+    JSON.stringify({
+      action: 'shipyard-repair',
+      client_payload: { issue: 7, pull_request: 12, repair_round: 2, handoff_token: 'trusted-handoff' },
+    }),
+  );
+  assert.match(readIssueEvent('trusted-handoff').skip, /expected Issue, PR, and round/i);
 });

@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: dymoo/shipyard/cloud-coder@<released-version>
+      - uses: dymoo/shipyard/cloud-coder@v3
         with:
           api-key: ${{ secrets.OPENAI_API_KEY }}
           base-url: https://api.openai.com/v1
@@ -34,4 +34,5 @@ jobs:
           terra-model: gpt-5.6-terra
           luna-reasoning-effort: xhigh
           terra-reasoning-effort: xhigh
+          handoff-token: ${{ secrets.SHIPYARD_HANDOFF_TOKEN }}
           sandbox-image: ghcr.io/acme/project-ci@sha256:replace-with-a-real-image-digest

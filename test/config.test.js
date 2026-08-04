@@ -68,24 +68,51 @@ test('pull request events run and unrelated events skip', () => {
 });
 
 test('a Shipyard repository dispatch schedules the named pull request', () => {
-  const ctx = withEvent(
-    'repository_dispatch',
-    { action: 'shipyard-review', client_payload: { pull_request: 42, issue: 7, repair_round: 0 } },
-    readEvent,
-  );
+  const dispatch = {
+    action: 'shipyard-review',
+    client_payload: { pull_request: 42, issue: 7, repair_round: 0, handoff_token: 'trusted-handoff' },
+  };
+  const ctx = withEvent('repository_dispatch', dispatch, () => readEvent('trusted-handoff'));
   assert.equal(ctx.prNumber, 42);
   assert.equal(ctx.trigger, 'cloud-coder');
   assert.equal(ctx.codingIssue, 7);
   assert.equal(ctx.repairRound, 0);
   assert.match(
-    withEvent('repository_dispatch', { action: 'shipyard-review', client_payload: { pull_request: 42 } }, readEvent)
-      .skip,
+    withEvent(
+      'repository_dispatch',
+      { action: 'shipyard-review', client_payload: { pull_request: 42, handoff_token: 'trusted-handoff' } },
+      () => readEvent('trusted-handoff'),
+    ).skip,
     /Issue and repair round/,
   );
   assert.equal(
     withEvent('repository_dispatch', { action: 'other', client_payload: { pull_request: 42 } }, readEvent).skip,
     'repository dispatch is not for Shipyard review',
   );
+});
+
+test('a forged Cloud Coder review dispatch cannot enter the reviewer workflow', () => {
+  const ctx = withEvent(
+    'repository_dispatch',
+    {
+      action: 'shipyard-review',
+      client_payload: { pull_request: 42, issue: 7, repair_round: 0, handoff_token: 'wrong' },
+    },
+    () => readEvent('trusted-handoff'),
+  );
+  assert.match(ctx.skip, /handoff token/i);
+});
+
+test('a forged Unicode handoff token is rejected without an action error', () => {
+  const ctx = withEvent(
+    'repository_dispatch',
+    {
+      action: 'shipyard-review',
+      client_payload: { pull_request: 42, issue: 7, repair_round: 0, handoff_token: 'a' },
+    },
+    () => readEvent('é'),
+  );
+  assert.match(ctx.skip, /handoff token/i);
 });
 
 test('trigger matching has a boundary and focus is bounded', () => {
@@ -95,12 +122,13 @@ test('trigger matching has a boundary and focus is bounded', () => {
   assert.equal(extractFocus('@shipyard'), '');
 });
 
-test('configuration has six public inputs and no URL fallback', () => {
+test('configuration has seven public inputs and no URL fallback', () => {
   const values = {
     'INPUT_API-KEY': 'model-secret',
     'INPUT_BASE-URL': 'https://models.example/v1///',
     INPUT_MODEL: 'reviewer',
     'INPUT_GITHUB-TOKEN': 'github-secret',
+    'INPUT_HANDOFF-TOKEN': 'handoff-secret',
     INPUT_INSTRUCTIONS: 'Use integer pence.',
     INPUT_IGNORE: 'private/**\n*.pem',
     GITHUB_API_URL: 'https://github.example/api/v3/',
@@ -109,6 +137,7 @@ test('configuration has six public inputs and no URL fallback', () => {
   assert.equal(config.baseUrl, 'https://models.example/v1');
   assert.equal(config.githubApiUrl, 'https://github.example/api/v3');
   assert.equal(config.instructions, 'Use integer pence.');
+  assert.equal(config.handoffToken, 'handoff-secret');
   assert.equal(config.requestTimeoutMs, 600000);
   assert.ok(config.ignore.includes('private/**'));
 
@@ -133,11 +162,11 @@ test('configuration has six public inputs and no URL fallback', () => {
   );
 });
 
-test('action metadata exposes only the six supported inputs', () => {
+test('action metadata exposes only the seven supported inputs', () => {
   const action = fs.readFileSync(new URL('../action.yml', import.meta.url), 'utf8');
   const inputBlock = action.slice(action.indexOf('inputs:'), action.indexOf('\noutputs:'));
   const names = [...inputBlock.matchAll(/^ {2}([a-z-]+):$/gm)].map((match) => match[1]);
-  assert.deepEqual(names, ['api-key', 'base-url', 'model', 'github-token', 'instructions', 'ignore']);
+  assert.deepEqual(names, ['api-key', 'base-url', 'model', 'github-token', 'handoff-token', 'instructions', 'ignore']);
   assert.match(inputBlock, /base-url:\n {4}description:[^\n]+\n {4}required: true/);
   assert.ok(!inputBlock.includes('https://api.openai.com'));
 });

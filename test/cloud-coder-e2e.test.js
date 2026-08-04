@@ -149,6 +149,7 @@ async function runAction(port, dockerDirectory) {
     GITHUB_OUTPUT: outputPath,
     'INPUT_API-KEY': 'model-secret',
     'INPUT_GITHUB-TOKEN': 'github-secret',
+    'INPUT_HANDOFF-TOKEN': 'handoff-secret',
     'INPUT_BASE-URL': `http://127.0.0.1:${port}/v1`,
     'INPUT_LUNA-MODEL': 'luna',
     'INPUT_TERRA-MODEL': 'terra',
@@ -192,7 +193,10 @@ test('the Cloud Coder entrypoint tests and publishes one draft before dispatchin
   ]);
   assert.deepEqual(captured.refUpdates, [{ sha: 'next-commit', force: false }]);
   assert.deepEqual(captured.dispatches, [
-    { event_type: 'shipyard-review', client_payload: { pull_request: 12, issue: 7, repair_round: 0 } },
+    {
+      event_type: 'shipyard-review',
+      client_payload: { pull_request: 12, issue: 7, repair_round: 0, handoff_token: 'handoff-secret' },
+    },
   ]);
   assert.match(run.output, /dispatched/);
   assert.match(run.output, /pull-request/);
@@ -202,4 +206,5 @@ test('the Cloud Coder entrypoint tests and publishes one draft before dispatchin
     .join('\n');
   assert.ok(!logged.includes('model-secret'));
   assert.ok(!logged.includes('github-secret'));
+  assert.ok(!logged.includes('handoff-secret'));
 });

@@ -33,6 +33,9 @@ inputs:
     description: Token used only by Shipyard's host-side GitHub broker.
     required: false
     default: ${{ github.token }}
+  handoff-token:
+    description: Shared secret that authenticates Cloud Coder and Cloud Reviewer dispatches.
+    required: true
   sandbox-image:
     description: Digest-pinned Docker image containing the repository's test toolchain.
     required: true

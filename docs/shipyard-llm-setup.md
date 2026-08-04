@@ -70,7 +70,7 @@ the local session before dispatch.
 
 ## Current release boundary
 
-Cloud Reviewer is available now as `dymoo/shipyard@v3`; see the README for
-the exact workflow. Cloud Coder is in development; until it is released, use
-the provided workflow as a contract only and retain its `<released-version>`
-placeholder.
+Cloud Reviewer is available as `dymoo/shipyard@v3` and Cloud Coder as
+`dymoo/shipyard/cloud-coder@v3`; see the README for the exact workflows. Both
+workflows need the same random `SHIPYARD_HANDOFF_TOKEN` Actions secret. It
+authenticates their repository-dispatch hand-offs and is not model context.

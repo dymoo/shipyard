@@ -12,10 +12,8 @@ fresh agent context. Shipyard then performs bounded work in GitHub Actions:
 implementation, independent adversarial review, and a hand-off for your final
 merge decision.
 
-**Released now:** Shipyard Cloud Reviewer at `dymoo/shipyard@v3`.
-
-**In development:** Shipyard Cloud Coder. Its workflow is intentionally shown
-with `<released-version>` until the action is released.
+**Released now:** Shipyard Cloud Reviewer at `dymoo/shipyard@v3` and Cloud
+Coder at `dymoo/shipyard/cloud-coder@v3`.
 
 ## The loop
 
@@ -100,12 +98,15 @@ jobs:
           api-key: ${{ secrets.OPENAI_API_KEY }}
           base-url: https://api.openai.com/v1
           model: gpt-5.6-luna
+          handoff-token: ${{ secrets.SHIPYARD_HANDOFF_TOKEN }}
 ```
 
-Add `OPENAI_API_KEY` under **Settings → Secrets and variables → Actions**. The
-reviewer needs an OpenAI-compatible Chat Completions endpoint with tool calling.
-It is API-key-only; a ChatGPT or Codex subscription is not a GitHub Actions
-credential.
+Add `OPENAI_API_KEY` and one random `SHIPYARD_HANDOFF_TOKEN` under **Settings →
+Secrets and variables → Actions**. The handoff token must be the same value in
+the Coder and Reviewer workflows; it authenticates their two repository-dispatch
+messages and is never passed to a model. The reviewer needs an OpenAI-compatible
+Chat Completions endpoint with tool calling. It is API-key-only; a ChatGPT or
+Codex subscription is not a GitHub Actions credential.
 
 The workflow intentionally has **no checkout**. `pull_request_target` remains
 safe only because Cloud Reviewer reads the pull-request snapshot and never
@@ -140,7 +141,9 @@ Install Shipyard Cloud Reviewer in this repository.
 5. Use the real endpoint/model available to the repository. Prefer
    gpt-5.6-luna when the OpenAI API is available; otherwise keep an existing
    compatible provider.
-6. Do not create a Cloud Coder workflow until Shipyard Cloud Coder is released.
+6. Add `SHIPYARD_HANDOFF_TOKEN` as an Actions secret and pass it to both
+   Shipyard actions. Generate it with a cryptographically secure random source;
+   never put it in the workflow file.
 7. Run the repository's workflow validation, then show the complete diff and
    identify the secret the maintainer must add.
 ```
@@ -153,7 +156,7 @@ raw token. Scores 4–5 route to GPT-5.6 Terra at `high` or `xhigh`; DeepSeek V4
 Flash remains an evaluated cost-sensitive alternative.
 
 `gpt-5.6-luna` is the API model identifier. `xhigh` is a reasoning-effort
-setting for Cloud Coder's future harness, not an input on this six-input,
+setting for Cloud Coder's harness, not an input on the seven-input,
 provider-agnostic reviewer.
 
 ## Add Shipyard Cloud Coder
@@ -168,9 +171,10 @@ to `.github/workflows/shipyard-coder.yml`. It deliberately has no checkout:
 Shipyard downloads the default-branch snapshot itself, and repository code runs
 only inside the sandboxed Docker copy.
 
-Cloud Coder is still a development preview in this branch. Do not enable the
-template until the first Coder release is tagged; replace `<released-version>`
-with that immutable release reference when it is published.
+Use `dymoo/shipyard/cloud-coder@v3` in the copied workflow. Add the same
+`SHIPYARD_HANDOFF_TOKEN` Actions secret used by Cloud Reviewer; this shared,
+masked token authenticates both directions of the one repair hand-off and is
+never exposed to either model.
 
 Before enabling it, replace the example `sandbox-image` with an image pinned to
 an actual SHA-256 digest. That image must already contain the repository's test
@@ -202,8 +206,8 @@ routing remains controlled by the Agent Brief complexity score.
   logical model call has one ten-minute deadline shared by retries.
 
 The public inputs are `api-key`, `base-url`, `model`, `github-token`,
-`instructions` and `ignore`. See [SECURITY.md](SECURITY.md) and the maintained
-[workflow example](examples/workflows/shipyard-reviewer.yml).
+`handoff-token`, `instructions` and `ignore`. See [SECURITY.md](SECURITY.md)
+and the maintained [workflow example](examples/workflows/shipyard-reviewer.yml).
 
 ### OpenRouter preflight
 
