@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { GitHub } from '../src/github.js';
 import { openRepo } from '../src/repo.js';
 import { fingerprint } from '../src/findings.js';
+import { createHandoffProof } from '../src/handoff.js';
 import { APP_DIFF, BINARY_DIFF, APP_CONTENT } from './fixtures.js';
 
 const ENTRY = fileURLToPath(new URL('../src/index.js', import.meta.url));
@@ -41,6 +42,25 @@ const FINDINGS = {
     },
   ],
 };
+
+function coderReviewDispatch(repairRound) {
+  const payload = { pull_request: 1, issue: 7, repair_round: repairRound, head_sha: 'headsha' };
+  return {
+    action: 'shipyard-review',
+    client_payload: {
+      ...payload,
+      handoff_proof: createHandoffProof('handoff-secret', {
+        direction: 'review',
+        owner: 'o',
+        repo: 'r',
+        issue: payload.issue,
+        pull: payload.pull_request,
+        repairRound: payload.repair_round,
+        headSha: payload.head_sha,
+      }),
+    },
+  };
+}
 
 function makeTarball(files, symlinks = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'shipyard-src-'));
@@ -111,7 +131,8 @@ function standardReply({ findings = FINDINGS, verdict = 'real' } = {}) {
  *   diffText?: string,
  *   symlinks?: Record<string, string>,
  *   issueComments?: any[],
- *   reviewComments?: any[]
+ *   reviewComments?: any[],
+ *   pullHeads?: string[]
  * }} [options]
  */
 async function stubServer({
@@ -123,6 +144,7 @@ async function stubServer({
   symlinks = {},
   issueComments = [],
   reviewComments = [],
+  pullHeads = [],
 } = {}) {
   const captured = {
     reviews: [],
@@ -134,6 +156,7 @@ async function stubServer({
     llmRequests: [],
   };
   const tarball = makeTarball(repoFiles, symlinks);
+  let pullReads = 0;
 
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
@@ -175,6 +198,7 @@ async function stubServer({
       }
       if (url.pathname === '/repos/o/r/pulls/1' && req.method === 'GET') {
         if ((req.headers.accept || '').includes('diff')) return send(200, diffText, 'text/plain');
+        const headSha = pullHeads[pullReads++] || 'headsha';
         return send(200, {
           number: 1,
           state: 'open',
@@ -182,7 +206,7 @@ async function stubServer({
           title: 'Guard the lookup',
           body: '',
           user: { login: 'alice' },
-          head: { sha: 'headsha', ref: 'shipyard/issue-7' },
+          head: { sha: headSha, ref: 'shipyard/issue-7' },
           base: { ref: 'main', sha: 'basesha' },
         });
       }
@@ -247,6 +271,7 @@ async function runAction(port, extra = {}) {
     'INPUT_BASE-URL': `http://127.0.0.1:${port}/v1`,
     INPUT_MODEL: 'stub-model',
     'INPUT_GITHUB-TOKEN': 'gh-token',
+    'INPUT_HANDOFF-TOKEN': 'handoff-secret',
     ...envOverrides,
   };
 
@@ -357,14 +382,50 @@ test('a Coder review dispatch requests exactly one repair when verified findings
 
   const run = await runAction(port, {
     GITHUB_EVENT_NAME: 'repository_dispatch',
-    __event: { action: 'shipyard-review', client_payload: { pull_request: 1, issue: 7, repair_round: 0 } },
+    __event: coderReviewDispatch(0),
   });
   assert.equal(run.code, 0, run.stderr);
   assert.deepEqual(captured.dispatchedEvents, [
-    { event_type: 'shipyard-repair', client_payload: { issue: 7, pull_request: 1, repair_round: 1 } },
+    {
+      event_type: 'shipyard-repair',
+      client_payload: {
+        issue: 7,
+        pull_request: 1,
+        repair_round: 1,
+        head_sha: 'headsha',
+        handoff_proof: createHandoffProof('handoff-secret', {
+          direction: 'repair',
+          owner: 'o',
+          repo: 'r',
+          issue: 7,
+          pull: 1,
+          repairRound: 1,
+          headSha: 'headsha',
+        }),
+      },
+    },
   ]);
   assert.deepEqual(captured.updatedPulls, []);
   assert.deepEqual(captured.labels, []);
+});
+
+test('a Coder review dispatch with only already-reported findings does not spend its repair round', async (t) => {
+  const finding = FINDINGS.findings.find((candidate) => candidate.line === 12);
+  const duplicate = fingerprint(finding, '  if (!user) return null;');
+  const { server, captured, port } = await stubServer({
+    llmReply: standardReply({ findings: { summary: FINDINGS.summary, findings: [finding] } }),
+    issueComments: [{ id: 20, body: `<!-- shipyard:fp=${duplicate} -->` }],
+  });
+  t.after(() => server.close());
+
+  const run = await runAction(port, {
+    GITHUB_EVENT_NAME: 'repository_dispatch',
+    __event: coderReviewDispatch(0),
+  });
+  assert.equal(run.code, 0, run.stderr);
+  assert.deepEqual(captured.dispatchedEvents, []);
+  assert.deepEqual(captured.updatedPulls, [{ draft: false }]);
+  assert.deepEqual(captured.labels, [{ labels: ['ready-for-human'] }]);
 });
 
 test('a repaired Coder draft becomes ready for local review even when findings remain', async (t) => {
@@ -373,12 +434,79 @@ test('a repaired Coder draft becomes ready for local review even when findings r
 
   const run = await runAction(port, {
     GITHUB_EVENT_NAME: 'repository_dispatch',
-    __event: { action: 'shipyard-review', client_payload: { pull_request: 1, issue: 7, repair_round: 1 } },
+    __event: coderReviewDispatch(1),
   });
   assert.equal(run.code, 0, run.stderr);
   assert.deepEqual(captured.dispatchedEvents, []);
   assert.deepEqual(captured.updatedPulls, [{ draft: false }]);
   assert.deepEqual(captured.labels, [{ labels: ['ready-for-human'] }]);
+});
+
+test('a valid hand-off proof cannot review or mutate a pull request after its head changes', async (t) => {
+  const { server, captured, port } = await stubServer();
+  t.after(() => server.close());
+
+  const payload = { pull_request: 1, issue: 7, repair_round: 0, head_sha: 'stale-head' };
+  const run = await runAction(port, {
+    GITHUB_EVENT_NAME: 'repository_dispatch',
+    __event: {
+      action: 'shipyard-review',
+      client_payload: {
+        ...payload,
+        handoff_proof: createHandoffProof('handoff-secret', {
+          direction: 'review',
+          owner: 'o',
+          repo: 'r',
+          issue: payload.issue,
+          pull: payload.pull_request,
+          repairRound: payload.repair_round,
+          headSha: payload.head_sha,
+        }),
+      },
+    },
+  });
+  assert.notEqual(run.code, 0);
+  assert.match(`${run.stdout}\n${run.stderr}`, /no longer matches the pull request head/);
+  assert.deepEqual(captured.reviews, []);
+  assert.deepEqual(captured.dispatchedEvents, []);
+  assert.deepEqual(captured.updatedPulls, []);
+});
+
+test('a head change during review cannot mark a newer commit ready', async (t) => {
+  const { server, captured, port } = await stubServer({ pullHeads: ['headsha', 'new-head'] });
+  t.after(() => server.close());
+
+  const run = await runAction(port, {
+    GITHUB_EVENT_NAME: 'repository_dispatch',
+    __event: coderReviewDispatch(1),
+  });
+  assert.notEqual(run.code, 0);
+  assert.match(`${run.stdout}\n${run.stderr}`, /no longer matches the pull request head/);
+  assert.deepEqual(captured.reviews, []);
+  assert.deepEqual(captured.createdComments, []);
+  assert.deepEqual(captured.updatedComments, []);
+  assert.deepEqual(captured.dispatchedEvents, []);
+  assert.deepEqual(captured.updatedPulls, []);
+  assert.deepEqual(captured.labels, []);
+});
+
+test('a head change after a bound inline review cannot post a summary or hand-off', async (t) => {
+  const { server, captured, port } = await stubServer({ pullHeads: ['headsha', 'headsha', 'new-head'] });
+  t.after(() => server.close());
+
+  const run = await runAction(port, {
+    GITHUB_EVENT_NAME: 'repository_dispatch',
+    __event: coderReviewDispatch(1),
+  });
+  assert.notEqual(run.code, 0);
+  assert.match(`${run.stdout}\n${run.stderr}`, /no longer matches the pull request head/);
+  assert.equal(captured.reviews.length, 1);
+  assert.equal(captured.reviews[0].commit_id, 'headsha');
+  assert.deepEqual(captured.createdComments, []);
+  assert.deepEqual(captured.updatedComments, []);
+  assert.deepEqual(captured.dispatchedEvents, []);
+  assert.deepEqual(captured.updatedPulls, []);
+  assert.deepEqual(captured.labels, []);
 });
 
 test('the investigation can read repository evidence with tools', async (t) => {

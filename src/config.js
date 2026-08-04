@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import * as core from './core.js';
+import { verifiesHandoffProof } from './handoff.js';
 
 export const SEVERITIES = ['critical', 'high', 'medium', 'low'];
 export const VERDICT_REAL = 'real';
@@ -73,6 +74,9 @@ export function readConfig() {
   const githubToken = requiredInput('github-token');
   core.mask(githubToken);
 
+  const handoffToken = core.getInput('handoff-token');
+  if (handoffToken) core.mask(handoffToken);
+
   const baseUrl = requiredHttpUrl('base-url', requiredInput('base-url'));
   const model = requiredInput('model');
   const githubApiUrl = requiredHttpUrl('GITHUB_API_URL', requiredEnv('GITHUB_API_URL'));
@@ -82,6 +86,7 @@ export function readConfig() {
     baseUrl,
     model,
     githubToken,
+    handoffToken,
     githubApiUrl,
     instructions: core.getInput('instructions'),
     ignore: [...DEFAULT_IGNORES, ...core.getLines('ignore')],
@@ -127,6 +132,7 @@ function requiredHttpUrl(name, value) {
  * @property {string} [focus]
  * @property {number} [codingIssue]
  * @property {number} [repairRound]
+ * @property {string} [headSha]
  * @property {string} [skip]
  */
 
@@ -134,7 +140,7 @@ function requiredHttpUrl(name, value) {
  * Resolve the pull request and apply the fixed comment-trigger author gate.
  * @returns {EventContext}
  */
-export function readEvent() {
+export function readEvent(handoffToken = '') {
   const [owner, repo] = requiredEnv('GITHUB_REPOSITORY').split('/');
   if (!owner || !repo) throw new Error('GITHUB_REPOSITORY must be in owner/repository form.');
 
@@ -175,16 +181,32 @@ export function readEvent() {
     }
     const codingIssue = payload.client_payload?.issue;
     const repairRound = payload.client_payload?.repair_round;
+    const headSha = payload.client_payload?.head_sha;
     if (
       !Number.isInteger(codingIssue) ||
       codingIssue < 1 ||
       !Number.isInteger(repairRound) ||
       repairRound < 0 ||
-      repairRound > 1
+      repairRound > 1 ||
+      typeof headSha !== 'string' ||
+      !headSha
     ) {
-      return { ...base, skip: 'repository dispatch did not include a valid Cloud Coder Issue and repair round' };
+      return {
+        ...base,
+        skip: 'repository dispatch did not include a valid Cloud Coder Issue, commit, and repair round',
+      };
     }
-    return { ...base, prNumber, trigger: 'cloud-coder', codingIssue, repairRound };
+    if (
+      !handoffToken ||
+      !verifiesHandoffProof(
+        handoffToken,
+        { direction: 'review', owner, repo, issue: codingIssue, pull: prNumber, repairRound, headSha },
+        payload.client_payload?.handoff_proof,
+      )
+    ) {
+      throw new Error('Shipyard review dispatch requires a valid hand-off token and proof.');
+    }
+    return { ...base, prNumber, trigger: 'cloud-coder', codingIssue, repairRound, headSha };
   }
 
   if (eventName === 'pull_request' || eventName === 'pull_request_target') {

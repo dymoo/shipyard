@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { createHandoffProof } from '../src/handoff.js';
 
 const ENTRY = fileURLToPath(new URL('../cloud-coder/src/index.js', import.meta.url));
 const IMAGE = `example.test/shipyard@sha256:${'a'.repeat(64)}`;
@@ -149,6 +150,7 @@ async function runAction(port, dockerDirectory) {
     GITHUB_OUTPUT: outputPath,
     'INPUT_API-KEY': 'model-secret',
     'INPUT_GITHUB-TOKEN': 'github-secret',
+    'INPUT_HANDOFF-TOKEN': 'handoff-secret',
     'INPUT_BASE-URL': `http://127.0.0.1:${port}/v1`,
     'INPUT_LUNA-MODEL': 'luna',
     'INPUT_TERRA-MODEL': 'terra',
@@ -192,7 +194,24 @@ test('the Cloud Coder entrypoint tests and publishes one draft before dispatchin
   ]);
   assert.deepEqual(captured.refUpdates, [{ sha: 'next-commit', force: false }]);
   assert.deepEqual(captured.dispatches, [
-    { event_type: 'shipyard-review', client_payload: { pull_request: 12, issue: 7, repair_round: 0 } },
+    {
+      event_type: 'shipyard-review',
+      client_payload: {
+        pull_request: 12,
+        issue: 7,
+        repair_round: 0,
+        head_sha: 'next-commit',
+        handoff_proof: createHandoffProof('handoff-secret', {
+          direction: 'review',
+          owner: 'o',
+          repo: 'r',
+          issue: 7,
+          pull: 12,
+          repairRound: 0,
+          headSha: 'next-commit',
+        }),
+      },
+    },
   ]);
   assert.match(run.output, /dispatched/);
   assert.match(run.output, /pull-request/);
@@ -202,4 +221,5 @@ test('the Cloud Coder entrypoint tests and publishes one draft before dispatchin
     .join('\n');
   assert.ok(!logged.includes('model-secret'));
   assert.ok(!logged.includes('github-secret'));
+  assert.ok(!logged.includes('handoff-secret'));
 });

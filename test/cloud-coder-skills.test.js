@@ -11,6 +11,10 @@ test('advertises implementation skills without spending context on their bodies'
   );
   assert.ok(skills.every((skill) => typeof skill.description === 'string' && skill.description.length > 0));
   assert.ok(skills.every((skill) => !('body' in skill)));
+  assert.match(
+    skills.find((skill) => skill.name === 'ponytail-review').description,
+    /Code review focused exclusively/i,
+  );
 });
 
 test('loads only an exact allowlisted skill body', () => {

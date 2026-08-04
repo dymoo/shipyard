@@ -70,7 +70,8 @@ the local session before dispatch.
 
 ## Current release boundary
 
-Cloud Reviewer is available now as `dymoo/shipyard@v3`; see the README for
-the exact workflow. Cloud Coder is in development; until it is released, use
-the provided workflow as a contract only and retain its `<released-version>`
-placeholder.
+Cloud Reviewer is available as `dymoo/shipyard@v3` and Cloud Coder as
+`dymoo/shipyard/cloud-coder@v3`; see the README for the exact workflows. Their
+repository-dispatch hand-offs require a HMAC proof bound to their direction,
+repository, Issue, PR, repair round and exact head commit. The shared secret is never
+retained in event payloads or exposed to a model.

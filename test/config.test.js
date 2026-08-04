@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { readConfig, readEvent, containsPhrase, extractFocus } from '../src/config.js';
+import { createHandoffProof } from '../src/handoff.js';
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'shipyard-event-'));
 
@@ -17,12 +18,12 @@ function withEnv(values, fn) {
   }
 }
 
-function withEvent(eventName, payload, fn) {
+function withEvent(eventName, payload, fn, repository = 'o/r') {
   const eventPath = path.join(tmp, `${Math.random().toString(36).slice(2)}.json`);
   fs.writeFileSync(eventPath, JSON.stringify(payload));
   return withEnv(
     {
-      GITHUB_REPOSITORY: 'o/r',
+      GITHUB_REPOSITORY: repository,
       GITHUB_EVENT_NAME: eventName,
       GITHUB_EVENT_PATH: eventPath,
     },
@@ -40,6 +41,25 @@ const comment = (overrides = {}) => ({
   },
   ...overrides,
 });
+
+function reviewDispatch(overrides = {}) {
+  const payload = { pull_request: 42, issue: 7, repair_round: 0, head_sha: 'headsha', ...overrides };
+  return {
+    action: 'shipyard-review',
+    client_payload: {
+      ...payload,
+      handoff_proof: createHandoffProof('handoff-secret', {
+        direction: 'review',
+        owner: 'o',
+        repo: 'r',
+        issue: payload.issue,
+        pull: payload.pull_request,
+        repairRound: payload.repair_round,
+        headSha: payload.head_sha,
+      }),
+    },
+  };
+}
 
 test('a collaborator mention schedules a focused review', () => {
   const ctx = withEvent('issue_comment', comment(), readEvent);
@@ -68,23 +88,42 @@ test('pull request events run and unrelated events skip', () => {
 });
 
 test('a Shipyard repository dispatch schedules the named pull request', () => {
-  const ctx = withEvent(
-    'repository_dispatch',
-    { action: 'shipyard-review', client_payload: { pull_request: 42, issue: 7, repair_round: 0 } },
-    readEvent,
-  );
+  const ctx = withEvent('repository_dispatch', reviewDispatch(), () => readEvent('handoff-secret'));
   assert.equal(ctx.prNumber, 42);
   assert.equal(ctx.trigger, 'cloud-coder');
   assert.equal(ctx.codingIssue, 7);
   assert.equal(ctx.repairRound, 0);
+  assert.equal(ctx.headSha, 'headsha');
   assert.match(
-    withEvent('repository_dispatch', { action: 'shipyard-review', client_payload: { pull_request: 42 } }, readEvent)
-      .skip,
-    /Issue and repair round/,
+    withEvent('repository_dispatch', reviewDispatch({ issue: undefined }), () => readEvent('handoff-secret')).skip,
+    /Issue, commit, and repair round/,
   );
   assert.equal(
     withEvent('repository_dispatch', { action: 'other', client_payload: { pull_request: 42 } }, readEvent).skip,
     'repository dispatch is not for Shipyard review',
+  );
+});
+
+test('a forged Cloud Coder review dispatch cannot enter the reviewer workflow', () => {
+  const dispatch = reviewDispatch();
+  dispatch.client_payload.handoff_proof = 'forged';
+  assert.throws(
+    () => withEvent('repository_dispatch', dispatch, () => readEvent('handoff-secret')),
+    /requires a valid hand-off token and proof/i,
+  );
+});
+
+test('a Coder review dispatch without the configured hand-off token fails visibly', () => {
+  assert.throws(
+    () => withEvent('repository_dispatch', reviewDispatch(), readEvent),
+    /requires a valid hand-off token and proof/i,
+  );
+});
+
+test('a proof from another repository cannot enter the reviewer workflow', () => {
+  assert.throws(
+    () => withEvent('repository_dispatch', reviewDispatch(), () => readEvent('handoff-secret'), 'other/r'),
+    /requires a valid hand-off token and proof/i,
   );
 });
 
@@ -95,12 +134,13 @@ test('trigger matching has a boundary and focus is bounded', () => {
   assert.equal(extractFocus('@shipyard'), '');
 });
 
-test('configuration has six public inputs and no URL fallback', () => {
+test('configuration has seven public inputs and no URL fallback', () => {
   const values = {
     'INPUT_API-KEY': 'model-secret',
     'INPUT_BASE-URL': 'https://models.example/v1///',
     INPUT_MODEL: 'reviewer',
     'INPUT_GITHUB-TOKEN': 'github-secret',
+    'INPUT_HANDOFF-TOKEN': 'handoff-secret',
     INPUT_INSTRUCTIONS: 'Use integer pence.',
     INPUT_IGNORE: 'private/**\n*.pem',
     GITHUB_API_URL: 'https://github.example/api/v3/',
@@ -110,6 +150,7 @@ test('configuration has six public inputs and no URL fallback', () => {
   assert.equal(config.githubApiUrl, 'https://github.example/api/v3');
   assert.equal(config.instructions, 'Use integer pence.');
   assert.equal(config.requestTimeoutMs, 600000);
+  assert.equal(config.handoffToken, 'handoff-secret');
   assert.ok(config.ignore.includes('private/**'));
 
   const withoutBase = { ...values };
@@ -133,11 +174,11 @@ test('configuration has six public inputs and no URL fallback', () => {
   );
 });
 
-test('action metadata exposes only the six supported inputs', () => {
+test('action metadata exposes only the seven supported inputs', () => {
   const action = fs.readFileSync(new URL('../action.yml', import.meta.url), 'utf8');
   const inputBlock = action.slice(action.indexOf('inputs:'), action.indexOf('\noutputs:'));
   const names = [...inputBlock.matchAll(/^ {2}([a-z-]+):$/gm)].map((match) => match[1]);
-  assert.deepEqual(names, ['api-key', 'base-url', 'model', 'github-token', 'instructions', 'ignore']);
+  assert.deepEqual(names, ['api-key', 'base-url', 'model', 'github-token', 'handoff-token', 'instructions', 'ignore']);
   assert.match(inputBlock, /base-url:\n {4}description:[^\n]+\n {4}required: true/);
   assert.ok(!inputBlock.includes('https://api.openai.com'));
 });

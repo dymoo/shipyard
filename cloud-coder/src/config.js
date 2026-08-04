@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import * as core from '../../src/core.js';
+import { verifiesHandoffProof } from '../../src/handoff.js';
 
 const REQUIRED_SECTIONS = [
   'Desired behaviour',
@@ -61,9 +62,12 @@ export function readConfig() {
   core.mask(apiKey);
   const githubToken = requiredInput('github-token');
   core.mask(githubToken);
+  const handoffToken = requiredInput('handoff-token');
+  core.mask(handoffToken);
   return {
     apiKey,
     githubToken,
+    handoffToken,
     baseUrl: requiredUrl('base-url', requiredInput('base-url')),
     lunaModel: requiredInput('luna-model'),
     terraModel: requiredInput('terra-model'),
@@ -90,7 +94,7 @@ export function reasoningEffortForComplexity(config, complexity) {
 }
 
 /** Resolve a new ready-for-agent Issue or one bounded reviewer-repair event. */
-export function readIssueEvent() {
+export function readIssueEvent(handoffToken = '') {
   const [owner, repo] = requiredEnv('GITHUB_REPOSITORY').split('/');
   if (!owner || !repo) throw new Error('GITHUB_REPOSITORY must be in owner/repository form.');
   const eventName = requiredEnv('GITHUB_EVENT_NAME');
@@ -103,10 +107,27 @@ export function readIssueEvent() {
     const issueNumber = payload.client_payload?.issue;
     const pullNumber = payload.client_payload?.pull_request;
     const repairRound = payload.client_payload?.repair_round;
-    if (!Number.isInteger(issueNumber) || !Number.isInteger(pullNumber) || repairRound !== 1) {
-      return { owner, repo, skip: 'repair dispatch did not include the expected Issue, PR, and round' };
+    const headSha = payload.client_payload?.head_sha;
+    if (
+      !Number.isInteger(issueNumber) ||
+      !Number.isInteger(pullNumber) ||
+      repairRound !== 1 ||
+      typeof headSha !== 'string' ||
+      !headSha
+    ) {
+      return { owner, repo, skip: 'repair dispatch did not include the expected Issue, PR, commit, and round' };
     }
-    return { owner, repo, issueNumber, pullNumber, repairRound };
+    if (
+      !handoffToken ||
+      !verifiesHandoffProof(
+        handoffToken,
+        { direction: 'repair', owner, repo, issue: issueNumber, pull: pullNumber, repairRound, headSha },
+        payload.client_payload?.handoff_proof,
+      )
+    ) {
+      throw new Error('Shipyard repair dispatch requires a valid hand-off token and proof.');
+    }
+    return { owner, repo, issueNumber, pullNumber, repairRound, headSha };
   }
   if (eventName !== 'issues' || payload.action !== 'labeled' || payload.label?.name !== 'ready-for-agent') {
     return { owner, repo, skip: 'event is not a ready-for-agent Issue label' };

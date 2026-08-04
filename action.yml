@@ -20,6 +20,10 @@ inputs:
     description: Token used to read the pull request and post comments.
     required: false
     default: ${{ github.token }}
+  handoff-token:
+    description: Shared secret used only to verify Coder dispatch proofs. Never placed in event payloads or model context.
+    required: false
+    default: ''
   instructions:
     description: Extra repository-specific review guidance.
     required: false

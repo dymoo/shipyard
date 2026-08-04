@@ -12,9 +12,12 @@ or telemetry. The reviewer can contact GitHub's API and its required `base-url`;
 the optional preflight can contact only `https://openrouter.ai/api/v1` and sends
 no repository content.
 
-**Credentials.** Model and GitHub keys are masked immediately. The reviewer key
-is sent only to `base-url`; the preflight key only to OpenRouter. There is no
-default or fallback model endpoint.
+**Credentials.** Model, GitHub and HMAC hand-off keys are masked immediately.
+The reviewer key is sent only to `base-url`; the preflight key only to
+OpenRouter. There is no default or fallback model endpoint. Coder/Reviewer
+dispatches contain a HMAC proof over repository, direction, Issue, PR, repair
+round and head SHA; the shared secret is never retained in an event payload or sent to a
+model. Receivers reject a proof unless the live pull-request head still matches.
 
 **OpenRouter routing.** When `base-url` is exactly
 `https://openrouter.ai/api/v1`, every request requires an endpoint with data
@@ -45,8 +48,10 @@ Posted model prose has reserved Shipyard markers and user mentions neutralised.
 
 **Who can spend the key.** Pull-request events can run automatically. The
 `@shipyard` comment trigger is limited to repository owners, members and
-collaborators. The required permissions are `contents: read` and
-`pull-requests: write`; the reviewer never pushes, approves or requests changes.
+collaborators. A standard review needs `contents: read` and `pull-requests:
+write`; the Coder hand-off workflow additionally needs `contents: write` and
+`issues: write` for its fixed, token-authenticated repair transition. The
+reviewer never pushes, approves or requests changes.
 
 ## Supply chain
 

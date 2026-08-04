@@ -17,10 +17,11 @@ import { collectInstructionDocs, renderConventions } from './codebase.js';
 import { investigate } from './agent.js';
 import { openRepo, openRepoViaApi } from './repo.js';
 import { commentBody, renderSummary, postInline, upsertSummary } from './post.js';
+import { createHandoffProof } from './handoff.js';
 
 async function main() {
   const config = readConfig();
-  const ctx = readEvent();
+  const ctx = readEvent(config.handoffToken);
 
   if (ctx.skip || !ctx.prNumber) {
     core.info(`Nothing to do: ${ctx.skip || 'no pull request number'}`);
@@ -30,6 +31,9 @@ async function main() {
 
   const gh = new GitHub(config.githubToken, { apiUrl: config.githubApiUrl });
   const pr = await gh.getPull(ctx.owner, ctx.repo, ctx.prNumber);
+  if (ctx.trigger === 'cloud-coder' && pr.head?.sha !== ctx.headSha) {
+    throw new Error('Cloud Coder hand-off no longer matches the pull request head.');
+  }
   if (pr.state !== 'open') core.warning(`Pull request is ${pr.state}.`);
 
   const diffText = await gh.getPullDiff(ctx.owner, ctx.repo, ctx.prNumber);
@@ -41,10 +45,11 @@ async function main() {
   assertCompleteReviewContext({ skipped });
 
   if (!selected.length) {
-    const summary = renderSummary(emptyResult(pr, skipped), config);
+    const currentPr = await refreshCloudCoderPull(gh, ctx, pr);
+    const summary = renderSummary(emptyResult(currentPr, skipped), config);
     core.appendSummary(summary);
     await upsertSummary(gh, ctx, summary);
-    await handoffCloudCoder(gh, ctx, pr, 0);
+    await handoffCloudCoder(gh, ctx, currentPr, config, 0);
     setOutputs(true, 0);
     return;
   }
@@ -171,8 +176,9 @@ async function main() {
   const freshAnchored = fresh.filter((finding) => finding.anchor);
   if (demoted.length) core.info(`${demoted.length} finding(s) could not be anchored and moved to the summary.`);
 
+  const currentPr = await refreshCloudCoderPull(gh, ctx, pr);
   const result = {
-    pr,
+    pr: currentPr,
     anchored,
     demoted,
     duplicates: findings.length - fresh.length,
@@ -196,25 +202,44 @@ async function main() {
       : {}),
     body: commentBody(finding, finding.anchor),
   }));
-  await postInline(gh, ctx, pr, comments);
+  await postInline(gh, ctx, currentPr, comments);
+  // GitHub binds inline comments to currentPr.head.sha. Recheck before the
+  // unversioned sticky summary so a newer head receives no old review output.
+  await refreshCloudCoderPull(gh, ctx, currentPr);
   await upsertSummary(gh, ctx, summary, issueComments);
-  await handoffCloudCoder(gh, ctx, pr, findings.length);
+  await handoffCloudCoder(gh, ctx, currentPr, config, fresh.length);
   setOutputs(true, findings.length);
 }
 
 /** Complete the one permitted Coder/Reviewer repair cycle; never merge code. */
-async function handoffCloudCoder(gh, ctx, pr, findings) {
+async function handoffCloudCoder(gh, ctx, pr, config, findings) {
   if (ctx.trigger !== 'cloud-coder' || !ctx.codingIssue || ctx.repairRound === undefined) return;
+  pr = await refreshCloudCoderPull(gh, ctx, pr);
   if (!pr.draft || pr.head?.ref !== `shipyard/issue-${ctx.codingIssue}`) {
     core.warning('Cloud Coder hand-off refused for a pull request outside the generated draft branch.');
     return;
   }
+  if (!pr.head?.sha) throw new Error('Cloud Coder hand-off requires the pull request head SHA.');
 
   if (findings && ctx.repairRound === 0) {
     await gh.request('POST', `/repos/${ctx.owner}/${ctx.repo}/dispatches`, {
       body: {
         event_type: 'shipyard-repair',
-        client_payload: { issue: ctx.codingIssue, pull_request: pr.number, repair_round: 1 },
+        client_payload: {
+          issue: ctx.codingIssue,
+          pull_request: pr.number,
+          repair_round: 1,
+          head_sha: pr.head.sha,
+          handoff_proof: createHandoffProof(config.handoffToken, {
+            direction: 'repair',
+            owner: ctx.owner,
+            repo: ctx.repo,
+            issue: ctx.codingIssue,
+            pull: pr.number,
+            repairRound: 1,
+            headSha: pr.head.sha,
+          }),
+        },
       },
     });
     core.info(`Requested one Cloud Coder repair for Issue #${ctx.codingIssue}.`);
@@ -226,6 +251,15 @@ async function handoffCloudCoder(gh, ctx, pr, findings) {
     body: { labels: ['ready-for-human'] },
   });
   core.info(`Draft PR #${pr.number} is ready for human or local-orchestrator review.`);
+}
+
+/** Refuse to publish review output against any commit other than the signed hand-off. */
+async function refreshCloudCoderPull(gh, ctx, pr) {
+  if (ctx.trigger !== 'cloud-coder') return pr;
+  const current = await gh.getPull(ctx.owner, ctx.repo, pr.number);
+  if (current.head?.sha !== ctx.headSha)
+    throw new Error('Cloud Coder hand-off no longer matches the pull request head.');
+  return current;
 }
 
 async function gatherContext({ llm, repo, rulesRepo, selected, diffText, pr, config }) {

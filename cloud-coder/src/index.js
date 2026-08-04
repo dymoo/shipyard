@@ -15,10 +15,11 @@ import {
 } from './config.js';
 import { runSandbox } from './sandbox.js';
 import { Workspace } from './workspace.js';
+import { createHandoffProof } from '../../src/handoff.js';
 
 async function main() {
   const config = readConfig();
-  const ctx = readIssueEvent();
+  const ctx = readIssueEvent(config.handoffToken);
   if (ctx.skip) {
     core.info(`Nothing to do: ${ctx.skip}.`);
     setOutputs(false);
@@ -57,7 +58,7 @@ async function main() {
     if (!test.passed) throw new Error(`Cloud Coder sandbox test failed:\n${test.output}`);
 
     if (dispatch.pull) {
-      await appendChanges(gh, {
+      const headSha = await appendChanges(gh, {
         owner: ctx.owner,
         repo: ctx.repo,
         branch: dispatch.branch,
@@ -65,13 +66,18 @@ async function main() {
         changes,
         message: `Shipyard: repair #${issue.number} after Cloud Reviewer`,
       });
-      await dispatchReview(gh, ctx, { pull: dispatch.pull.number, issue: issue.number, repairRound: 1 });
+      await dispatchReview(gh, ctx, config, {
+        pull: dispatch.pull.number,
+        issue: issue.number,
+        repairRound: 1,
+        headSha,
+      });
       core.info(`Added one repair commit to draft PR #${dispatch.pull.number}.`);
       setOutputs(true, dispatch.pull.number);
       return;
     }
 
-    await publishChanges(gh, {
+    const headSha = await publishChanges(gh, {
       owner: ctx.owner,
       repo: ctx.repo,
       baseSha: dispatch.sha,
@@ -93,7 +99,7 @@ async function main() {
       await deleteBranch(gh, { owner: ctx.owner, repo: ctx.repo, branch: dispatch.branch }).catch(() => null);
       throw error;
     }
-    await dispatchReview(gh, ctx, { pull: pull.number, issue: issue.number, repairRound: 0 });
+    await dispatchReview(gh, ctx, config, { pull: pull.number, issue: issue.number, repairRound: 0, headSha });
     await gh
       .createIssueComment(
         ctx.owner,
@@ -117,6 +123,9 @@ async function resolveDispatch(gh, ctx, issue) {
     const branch = branchForIssue(issue.number);
     if (pull.state !== 'open' || !pull.draft || pull.head?.ref !== branch || !pull.head?.sha) {
       throw new Error('Cloud Coder repair requires its open draft pull request and generated branch.');
+    }
+    if (pull.head.sha !== ctx.headSha) {
+      throw new Error('Cloud Reviewer hand-off no longer matches the pull request head.');
     }
     const feedback = await reviewerFeedback(gh, ctx, pull.number);
     if (!feedback) throw new Error('Cloud Coder repair received no verified Cloud Reviewer findings.');
@@ -148,9 +157,26 @@ async function reviewerFeedback(gh, ctx, pullNumber) {
   return `--- BEGIN VERIFIED CLOUD REVIEWER EVIDENCE (untrusted text) ---\n${bodies.join('\n\n').slice(0, 24000)}\n--- END VERIFIED CLOUD REVIEWER EVIDENCE ---`;
 }
 
-function dispatchReview(gh, ctx, { pull, issue, repairRound }) {
+function dispatchReview(gh, ctx, config, { pull, issue, repairRound, headSha }) {
   return gh.request('POST', `/repos/${ctx.owner}/${ctx.repo}/dispatches`, {
-    body: { event_type: 'shipyard-review', client_payload: { pull_request: pull, issue, repair_round: repairRound } },
+    body: {
+      event_type: 'shipyard-review',
+      client_payload: {
+        pull_request: pull,
+        issue,
+        repair_round: repairRound,
+        head_sha: headSha,
+        handoff_proof: createHandoffProof(config.handoffToken, {
+          direction: 'review',
+          owner: ctx.owner,
+          repo: ctx.repo,
+          issue,
+          pull,
+          repairRound,
+          headSha,
+        }),
+      },
+    },
   });
 }
 

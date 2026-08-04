@@ -43,5 +43,6 @@ test('reads and lists ordinary workspace files without following links', async (
   const workspace = new Workspace(root);
 
   assert.equal(await workspace.read('src/app.js'), 'export const app = true;');
+  await assert.rejects(() => workspace.read('src/link.js'), /symlink target/i);
   assert.deepEqual(await workspace.list(), ['src/app.js']);
 });

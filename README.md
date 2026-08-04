@@ -12,10 +12,8 @@ fresh agent context. Shipyard then performs bounded work in GitHub Actions:
 implementation, independent adversarial review, and a hand-off for your final
 merge decision.
 
-**Released now:** Shipyard Cloud Reviewer at `dymoo/shipyard@v3`.
-
-**In development:** Shipyard Cloud Coder. Its workflow is intentionally shown
-with `<released-version>` until the action is released.
+**Released now:** Shipyard Cloud Reviewer at `dymoo/shipyard@v3` and Cloud
+Coder at `dymoo/shipyard/cloud-coder@v3`.
 
 ## The loop
 
@@ -91,7 +89,7 @@ jobs:
     if: >-
       (github.event_name == 'pull_request_target' &&
        !startsWith(github.event.pull_request.head.ref, 'shipyard/issue-')) ||
-      github.event_name == 'repository_dispatch' ||
+      (github.event_name == 'repository_dispatch' && github.event.action == 'shipyard-review') ||
       (github.event.issue.pull_request && contains(github.event.comment.body, '@shipyard'))
     runs-on: ubuntu-latest
     steps:
@@ -100,12 +98,16 @@ jobs:
           api-key: ${{ secrets.OPENAI_API_KEY }}
           base-url: https://api.openai.com/v1
           model: gpt-5.6-luna
+          handoff-token: ${{ secrets.SHIPYARD_HANDOFF_TOKEN }}
 ```
 
-Add `OPENAI_API_KEY` under **Settings → Secrets and variables → Actions**. The
-reviewer needs an OpenAI-compatible Chat Completions endpoint with tool calling.
-It is API-key-only; a ChatGPT or Codex subscription is not a GitHub Actions
-credential.
+Add `OPENAI_API_KEY` and a random `SHIPYARD_HANDOFF_TOKEN` under **Settings →
+Secrets and variables → Actions**. The reviewer needs an OpenAI-compatible Chat
+Completions endpoint with tool calling. It is API-key-only; a ChatGPT or Codex
+subscription is not a GitHub Actions credential. Coder/Reviewer repository
+dispatches carry an HMAC proof, bound to the repository, direction, Issue, PR,
+repair round and exact head commit. The secret is never sent in a retained event payload or
+to either model.
 
 The workflow intentionally has **no checkout**. `pull_request_target` remains
 safe only because Cloud Reviewer reads the pull-request snapshot and never
@@ -140,7 +142,9 @@ Install Shipyard Cloud Reviewer in this repository.
 5. Use the real endpoint/model available to the repository. Prefer
    gpt-5.6-luna when the OpenAI API is available; otherwise keep an existing
    compatible provider.
-6. Do not create a Cloud Coder workflow until Shipyard Cloud Coder is released.
+6. Create one random `SHIPYARD_HANDOFF_TOKEN` Actions secret and pass it to both
+   Shipyard actions as `handoff-token`. Do not add any secret to a
+   `repository_dispatch` payload.
 7. Run the repository's workflow validation, then show the complete diff and
    identify the secret the maintainer must add.
 ```
@@ -153,7 +157,7 @@ raw token. Scores 4–5 route to GPT-5.6 Terra at `high` or `xhigh`; DeepSeek V4
 Flash remains an evaluated cost-sensitive alternative.
 
 `gpt-5.6-luna` is the API model identifier. `xhigh` is a reasoning-effort
-setting for Cloud Coder's future harness, not an input on this six-input,
+setting for Cloud Coder's harness, not an input on the seven-input,
 provider-agnostic reviewer.
 
 ## Add Shipyard Cloud Coder
@@ -168,9 +172,10 @@ to `.github/workflows/shipyard-coder.yml`. It deliberately has no checkout:
 Shipyard downloads the default-branch snapshot itself, and repository code runs
 only inside the sandboxed Docker copy.
 
-Cloud Coder is still a development preview in this branch. Do not enable the
-template until the first Coder release is tagged; replace `<released-version>`
-with that immutable release reference when it is published.
+Use `dymoo/shipyard/cloud-coder@v3` in the copied workflow. Both actions must
+receive the same `SHIPYARD_HANDOFF_TOKEN`; Shipyard uses it only to sign and
+verify context-bound HMAC hand-offs, never stores it in the dispatch payload,
+and never exposes it to either model.
 
 Before enabling it, replace the example `sandbox-image` with an image pinned to
 an actual SHA-256 digest. That image must already contain the repository's test
@@ -201,7 +206,7 @@ routing remains controlled by the Agent Brief complexity score.
 - No completion-token cap. The provider/model owns completion length, while each
   logical model call has one ten-minute deadline shared by retries.
 
-The public inputs are `api-key`, `base-url`, `model`, `github-token`,
+The public inputs are `api-key`, `base-url`, `model`, `github-token`, `handoff-token`,
 `instructions` and `ignore`. See [SECURITY.md](SECURITY.md) and the maintained
 [workflow example](examples/workflows/shipyard-reviewer.yml).
 
