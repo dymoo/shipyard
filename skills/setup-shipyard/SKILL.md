@@ -1,0 +1,199 @@
+---
+name: setup-shipyard
+description: Verify Matt Pocock's real skills, then safely install and configure Shipyard's GitHub Actions factory and repository agent instructions.
+---
+
+# Set up Shipyard
+
+Use this skill once in a repository before its local coding session uses the
+`shipyard` skill to define or dispatch work. This is a bootstrap skill, not an
+implementation-planning workflow.
+
+## Hard dependency
+
+Before editing the target repository, inspect the local tool's _available skill
+registry_ for these real Matt Pocock skills:
+
+```text
+triage
+wayfinder
+to-spec
+to-tickets
+implement
+tdd
+code-review
+```
+
+If any are absent, report the exact missing names and stop. Do not imitate the
+missing workflow with a generic prompt, partially configure GitHub Actions, or
+apply `ready-for-agent`. Install or configure Matt's real skills in the local
+tool, then run `setup-shipyard` again.
+
+## Discover before changing anything
+
+Read the target repository's root `AGENTS.md` and `CLAUDE.md` when present, its
+existing GitHub Actions workflows, package/test commands, and `git remote -v`.
+Confirm that GitHub Actions is the intended execution platform.
+
+Collect these values from existing repository configuration or ask the user;
+never invent them:
+
+- a self-hosted runner label with Docker, such as an ARC scale-set release
+  name, plus the numeric GitHub **organisation runner-group ID** that owns it;
+  never use the broad `self-hosted` label;
+- the OpenAI-compatible API base URL, reviewer model, low-tier Coder model and
+  high-tier Coder model;
+- the optional reasoning effort for each Coder tier;
+- a SHA-256 digest-pinned Docker image containing the target repository's test
+  toolchain;
+- names of the existing model-key and hand-off-token Actions secrets, or
+  confirmation that the maintainer will create `LLM_API_KEY` and
+  `SHIPYARD_HANDOFF_TOKEN`.
+
+Do not print, write, or request secret values in an Issue, pull request,
+workflow file, repository Variable, model prompt, or command output.
+
+Before editing workflows, run the bundled validator in `preflight` mode with the
+confirmed non-secret values. It rejects a broad runner, invalid secret name,
+un-pinned image, invalid endpoint, or missing model selection before any target
+repository file changes:
+
+```text
+node /path/to/setup-shipyard/validate.mjs --mode preflight --root /path/to/repo --repository owner/repo \
+  --runner-label shipyard-runners --runner-group-id 42 --model-secret LLM_API_KEY \
+  --handoff-secret SHIPYARD_HANDOFF_TOKEN --sandbox-image registry/image@sha256:<64-lowercase-hex> \
+  --base-url https://provider.example/v1 --reviewer-model provider/reviewer \
+  --low-complexity-model provider/low --high-complexity-model provider/high
+```
+
+Append `--low-complexity-reasoning-effort` and
+`--high-complexity-reasoning-effort` only when those optional Variables are
+configured. The validator then verifies their live values as well.
+
+This requires `gh` authentication with organisation runner-group read access.
+The installed check accepts a runner group only when it is private to exactly
+this repository and restricted to the two Shipyard workflow paths on the
+repository's default branch. It must also have one registered runner using the
+configured label during setup; for ARC, set `minRunners: 1` until validation
+passes. Do not use a shared runner group.
+
+Setup is deliberately **recoverable, not transactional**: local files and
+GitHub configuration cannot be committed atomically. Before changing any
+workflow or Variable, set `SHIPYARD_CODER_READY=false`. Make all remaining
+changes, run `installed` validation, and only then let the maintainer enable
+Coder. If interrupted, leave Coder disabled, preserve the partial state for
+inspection, fix it by running this skill again, and never apply
+`ready-for-agent` to test a partial installation.
+
+## Install the factory
+
+1. Start from Shipyard's maintained, versioned workflow examples:
+
+   - Reviewer: `examples/workflows/shipyard-reviewer.yml`, using
+     `dymoo/shipyard@v3`.
+   - Coder: `examples/workflows/shipyard-coder.yml`, using
+     `dymoo/shipyard/cloud-coder@v4`.
+
+   Install each complete canonical workflow into its dedicated path:
+   `.github/workflows/shipyard-reviewer.yml` and
+   `.github/workflows/shipyard-coder.yml`. The bundled copies in
+   `templates/` are the validator's source of truth. Do not add jobs, steps,
+   actions, permissions, inputs, checkout/install/build/shell behaviour or
+   comments to either file. If either path already contains shared or modified
+   automation, stop and ask the maintainer to move that automation elsewhere;
+   never merge it into a Shipyard workflow.
+
+2. Replace the example runner label and sandbox-image placeholder with the
+   confirmed dedicated label and digest. Do not add checkout, install, build or
+   shell steps to the Reviewer workflow. Both actions receive only their
+   documented inputs. When discovery found existing secret names, replace
+   `secrets.LLM_API_KEY` and `secrets.SHIPYARD_HANDOFF_TOKEN` in both copied
+   workflows with those names; otherwise create secrets with exactly the example
+   names. The Coder and Reviewer must reference the same hand-off secret name.
+
+3. First set `SHIPYARD_CODER_READY=false`, then configure repository
+   **Variables**, never action defaults:
+
+   ```text
+   LLM_BASE_URL
+   LLM_MODEL
+   SHIPYARD_CODER_LOW_COMPLEXITY_MODEL
+   SHIPYARD_CODER_HIGH_COMPLEXITY_MODEL
+   SHIPYARD_CODER_LOW_COMPLEXITY_REASONING_EFFORT   # optional
+   SHIPYARD_CODER_HIGH_COMPLEXITY_REASONING_EFFORT  # optional
+   SHIPYARD_CODER_READY=false
+   ```
+
+   Ensure the confirmed model-key and shared hand-off-token names are Actions
+   secrets. Immediately before enabling, use `gh secret list` to confirm both
+   names exist and get the maintainer's explicit confirmation that both secret
+   values are active after their latest rotation. Do not enable Coder by setting
+   `SHIPYARD_CODER_READY=true` until that verification, its model Variables,
+   dedicated runner, and pinned test image are all confirmed. Clear
+   `SHIPYARD_CODER_READY` before either secret is removed or rotated, then repeat
+   this verification before enabling it again.
+
+4. Merge this exact focused section into the target repository's root
+   `AGENTS.md`. `templates/AGENTS.md` is the validator's source of truth.
+   Preserve all existing instructions outside this section and do not create a
+   personal-only file.
+
+   ```md
+   ## Shipyard
+
+   The local Codex or Claude Code session owns Matt Pocock planning skills,
+   ticket quality, escalation and final merge judgement. Shipyard runs bounded
+   Coder and independent Reviewer work in GitHub Actions; it never auto-merges.
+
+   Apply `ready-for-agent` only to an open GitHub Issue with a complete Agent
+   Brief: desired behaviour, non-goals, acceptance checks, exact test command,
+   affected boundary, dependencies or blockers, risks, and complexity 1–5.
+   Do not dispatch vague initiatives, fork work, or work without Matt's real
+   skills available locally.
+
+   Coder requires a dedicated Docker-capable runner and a digest-pinned test
+   image. Keep `SHIPYARD_CODER_READY` false until the required Actions secrets
+   are confirmed active, model Variables, runner, and image are configured.
+   Clear it before either secret rotates. Coder may create a draft PR and
+   perform one bounded repair after Cloud Reviewer findings; the local session
+   or a human decides whether to merge.
+   ```
+
+5. Update the target repository's human README with a short Shipyard setup link
+   when it has contributor setup documentation. Point to the versioned
+   workflows, required Variables/secrets, dedicated runner requirement, and the
+   fact that the local `shipyard` skill—not the cloud agent—creates Agent
+   Briefs.
+
+## Validate and enable deliberately
+
+1. Review the complete workflow and `AGENTS.md` diff. Run the target
+   repository's normal formatting, lint, type and test checks when they exist.
+2. With `gh`, verify workflow files are present and use `gh secret list` to
+   confirm both required secret names immediately before enablement. Confirm both
+   Coder and Reviewer use the confirmed runner label and its private,
+   workflow-restricted organisation runner group. Confirm Coder also uses a
+   real digest and the `SHIPYARD_CODER_READY == 'true'` admission condition.
+3. Confirm the reviewer still has no checkout, no execution of pull-request
+   code, and no model-controlled write path.
+4. Run the bundled validator again in `installed` mode with the same values.
+   It accepts only the two complete bundled templates with the confirmed runner,
+   secret names and Coder image substituted. This proves the action versions,
+   model-Variable wiring, runner labels, permissions, Coder image, Reviewer
+   no-checkout/no-shell boundary, and the target `AGENTS.md` contract. Using
+   `gh`, it also proves the configured Variables are live, Coder admission is
+   still `false`, the runner group is isolated to the two Shipyard workflows,
+   a registered runner backs the configured label, and the two required secret
+   _names_ exist without reading their values. Do not call setup complete
+   unless it passes.
+5. Only after the validator has passed and the maintainer has confirmed active
+   secret values and all configuration is confirmed, set
+   `SHIPYARD_CODER_READY=true`. Leave it false when any dependency is pending,
+   and clear it before a secret rotation or removal. Do not manufacture a test
+   Issue or apply `ready-for-agent` merely to prove installation.
+
+## Hand off to normal Shipyard operation
+
+Report the installed workflow paths, runner label, non-secret Variables, secret
+_names_ only, whether Coder is enabled, and any blocker. Then use the
+`shipyard` skill for triage, Wayfinder, Agent Briefs and final local review.

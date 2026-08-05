@@ -74,8 +74,9 @@ test('the Shipyard reviewer pilot targets the dedicated ARC scale set', () => {
   assert.match(example, /vars\.LLM_MODEL != ''/);
 
   const readme = fs.readFileSync(new URL('../README.md', import.meta.url), 'utf8');
-  assert.match(readme, /vars\.LLM_BASE_URL != ''/);
-  assert.match(readme, /vars\.LLM_MODEL != ''/);
+  assert.match(readme, /Do \*\*not\*\* create a reviewer-only workflow from this README/);
+  assert.match(readme, /`setup-shipyard`/);
+  assert.doesNotMatch(readme, /^## Add Shipyard Cloud Reviewer$/m);
 });
 
 test('dispatches only when ready-for-agent labels an Issue', (t) => {

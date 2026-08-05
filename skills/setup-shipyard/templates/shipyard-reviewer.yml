@@ -1,0 +1,43 @@
+# Recommended setup: review every push to a pull request, and re-review on demand
+# when someone comments @shipyard.
+#
+# pull_request_target is safe here because Shipyard never checks out or runs
+# the pull request's code. Do not add actions/checkout of the head ref below.
+name: Shipyard Cloud Reviewer
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
+  repository_dispatch:
+    types: [shipyard-review]
+
+permissions:
+  # Repository dispatch requires contents: write. Shipyard never exposes this
+  # token to the model and uses it only for the fixed repair hand-off.
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: shipyard-review-${{ github.event.pull_request.number || github.event.issue.number || github.event.client_payload.pull_request }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: >-
+      vars.LLM_BASE_URL != '' &&
+      vars.LLM_MODEL != '' &&
+      ((github.event_name == 'pull_request_target' &&
+       !startsWith(github.event.pull_request.head.ref, 'shipyard/issue-')) ||
+      (github.event_name == 'repository_dispatch' && github.event.action == 'shipyard-review') ||
+      (github.event.issue.pull_request && contains(github.event.comment.body, '@shipyard')))
+    runs-on: shipyard-runners
+    steps:
+      - uses: dymoo/shipyard@v3
+        with:
+          api-key: ${{ secrets.LLM_API_KEY }}
+          base-url: ${{ vars.LLM_BASE_URL }}
+          model: ${{ vars.LLM_MODEL }}
+          handoff-token: ${{ secrets.SHIPYARD_HANDOFF_TOKEN }}
