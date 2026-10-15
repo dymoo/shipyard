@@ -36,6 +36,18 @@ inputs:
     description: Newline-separated path globs added to the built-in ignore list.
     required: false
     default: ''
+  max-tool-calls:
+    description: Maximum repository lookups during investigation, from 1 to 500.
+    required: false
+    default: '80'
+  request-timeout-minutes:
+    description: Deadline in minutes for one model call, including retries, from 1 to 120.
+    required: false
+    default: '20'
+  max-files:
+    description: Maximum changed files to review, from 1 to 500. Later files are omitted with a warning.
+    required: false
+    default: '150'
 
 outputs:
   findings:

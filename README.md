@@ -224,19 +224,29 @@ Agent Brief complexity score.
 - Diff-derived anchors: a model never chooses an inline comment location.
 - Base-commit instructions, so a PR cannot rewrite its own review policy.
 - No checkout, shell, network tool or write path inside the reviewed snapshot.
-- Fail-closed review coverage: a non-ignored file without usable textual review
-  evidence fails the run instead of claiming a clean review.
-- No completion-token cap. The provider/model owns completion length, while each
-  logical model call has one ten-minute deadline shared by retries.
+- Fail-closed review coverage: a selected non-ignored file without usable
+  textual review evidence fails the run instead of claiming a clean review.
+  Files past `max-files` are a declared truncation.
+- No completion-token cap. The provider/model owns completion length. Each
+  logical model call has one deadline shared by retries; the default is 20
+  minutes (`request-timeout-minutes`).
+- Investigation stops after `max-tool-calls` repository lookups (default 80).
+- Changed files within `max-files` (default 150) are reviewed in token-sized
+  chunks. Files past that cap are omitted with a workflow warning and listed
+  in the summary.
 
 The public inputs are `api-key`, `base-url`, `model`, `reasoning-effort`,
-`github-token`, `handoff-token`, `instructions` and `ignore`. Omit
-`reasoning-effort` to use the provider default. Allowed values are `low`,
-`medium`, `high`, `xhigh` and `max`; explicit values are sent unchanged and are
-never removed during endpoint-parameter retries. See
+`github-token`, `handoff-token`, `instructions`, `ignore`, `max-tool-calls`,
+`request-timeout-minutes` and `max-files`. Omit `reasoning-effort` to use the
+provider default. Allowed values are `low`, `medium`, `high`, `xhigh` and
+`max`; explicit values are sent unchanged and are never removed during
+endpoint-parameter retries. Omit the three limit inputs to keep the defaults
+above. The released `@v3` tag does not accept `reasoning-effort` or those
+limit inputs; pin a supporting immutable revision until a release updates the
+tag. See
 [SECURITY.md](SECURITY.md) and the maintained
 [workflow example](examples/workflows/shipyard-reviewer.yml). The canonical
-`@v3` example intentionally omits the unreleased input; a supporting immutable
+`@v3` example intentionally omits the unreleased inputs; a supporting immutable
 workflow revision may pass `vars.LLM_REASONING_EFFORT` to `reasoning-effort`.
 
 ### OpenRouter preflight

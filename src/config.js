@@ -50,13 +50,13 @@ const ALLOWED_ASSOCIATIONS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
 export const VALID_REASONING_EFFORTS = Object.freeze(['low', 'medium', 'high', 'xhigh', 'max']);
 
 /**
- * Product limits are deliberate constants, not user-facing tuning knobs.
- * Raising one changes cost or safety and therefore belongs in a reviewed
- * release rather than an opaque workflow input.
+ * Fixed product limits. Lookup count, request deadline and the file cap are
+ * action inputs, because a large pull request has to raise those three
+ * together. The rest stay constants: a workflow must not quietly change
+ * review cost or the fail-closed coverage gate.
  */
 const LIMITS = {
   agentTurns: 12,
-  maxFiles: 60,
   maxFileBytes: 400000,
   contextLines: 20,
   maxInputTokens: 120000,
@@ -64,8 +64,15 @@ const LIMITS = {
   concurrency: 4,
   maxFindings: 25,
   minSeverity: 'low',
-  requestTimeoutMs: 600000,
 };
+
+/** Defaults match action.yml. Ceilings stop a typo becoming an unbounded spend. */
+export const DEFAULT_MAX_TOOL_CALLS = 80;
+export const DEFAULT_REQUEST_TIMEOUT_MINUTES = 20;
+export const DEFAULT_MAX_FILES = 150;
+const MAX_TOOL_CALLS_LIMIT = 500;
+const MAX_TIMEOUT_MINUTES = 120;
+const MAX_FILES_LIMIT = 500;
 
 export function readConfig() {
   const apiKey = requiredInput('api-key');
@@ -81,6 +88,14 @@ export function readConfig() {
   const model = requiredInput('model');
   const reasoningEffort = validateReasoningEffort(core.getInput('reasoning-effort'));
   const githubApiUrl = requiredHttpUrl('GITHUB_API_URL', requiredEnv('GITHUB_API_URL'));
+  const maxToolCalls = boundedInteger('max-tool-calls', DEFAULT_MAX_TOOL_CALLS, 1, MAX_TOOL_CALLS_LIMIT);
+  const requestTimeoutMinutes = boundedInteger(
+    'request-timeout-minutes',
+    DEFAULT_REQUEST_TIMEOUT_MINUTES,
+    1,
+    MAX_TIMEOUT_MINUTES,
+  );
+  const maxFiles = boundedInteger('max-files', DEFAULT_MAX_FILES, 1, MAX_FILES_LIMIT);
 
   return {
     apiKey,
@@ -93,7 +108,22 @@ export function readConfig() {
     instructions: core.getInput('instructions'),
     ignore: [...DEFAULT_IGNORES, ...core.getLines('ignore')],
     ...LIMITS,
+    maxToolCalls,
+    maxFiles,
+    requestTimeoutMs: requestTimeoutMinutes * 60 * 1000,
   };
+}
+
+function boundedInteger(name, fallback, min, max) {
+  const raw = core.getInput(name, String(fallback));
+  if (!/^[0-9]+$/.test(raw)) {
+    throw new Error(`Input "${name}" must be an integer from ${min} to ${max}.`);
+  }
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value < min || value > max) {
+    throw new Error(`Input "${name}" must be an integer from ${min} to ${max}.`);
+  }
+  return value;
 }
 
 function requiredInput(name) {

@@ -4,6 +4,7 @@
  * repository snapshot.
  */
 import * as core from './core.js';
+import { DEFAULT_MAX_TOOL_CALLS } from './config.js';
 import { matchAny, matchGlob, estimateTokens } from './context.js';
 
 const MAX_READ_LINES = 400;
@@ -11,7 +12,7 @@ const MAX_SEARCH_HITS = 60;
 const MAX_SEARCH_FILES = 1000;
 const MAX_LIST = 300;
 const MAX_GLOB_LENGTH = 500;
-const MAX_TOOL_CALLS = 32;
+const MAX_CALLS_PER_TURN = 8;
 const MAX_BRIEFING_CHARS = 32000;
 
 export const TOOLS = [
@@ -197,15 +198,17 @@ function parseArgs(raw) {
 
 /**
  * Run the model/tool exchange with a hard turn cap.
- * @returns {Promise<{text: string, turns: number, calls: number, capped: boolean}|null>}
+ * @returns {Promise<{text: string, turns: number, calls: number, capped: boolean, lookupCapped?: boolean}|null>}
  */
 export async function toolLoop(llm, { system, user, repo, config, turns, closing, label = 'investigation' }) {
   const messages = [
     { role: 'system', content: system },
     { role: 'user', content: user },
   ];
+  const maxToolCalls = config.maxToolCalls ?? DEFAULT_MAX_TOOL_CALLS;
 
   let calls = 0;
+  let lookupCapped = false;
   for (let turn = 0; turn < turns; turn++) {
     let message;
     try {
@@ -224,7 +227,7 @@ export async function toolLoop(llm, { system, user, repo, config, turns, closing
       return { text: boundBriefing(text), turns: turn + 1, calls, capped: false };
     }
 
-    const acceptedCalls = toolCalls.slice(0, Math.min(8, MAX_TOOL_CALLS - calls));
+    const acceptedCalls = toolCalls.slice(0, Math.min(MAX_CALLS_PER_TURN, maxToolCalls - calls));
     if (!acceptedCalls.length) break;
     // Every tool call retained in assistant history must receive a matching
     // tool result or strict endpoints reject the next request.
@@ -241,8 +244,9 @@ export async function toolLoop(llm, { system, user, repo, config, turns, closing
         content: result.length > 60000 ? `${result.slice(0, 60000)}\n… truncated …` : result,
       });
     }
-    if (calls >= MAX_TOOL_CALLS) {
-      core.warning(`${label} hit the ${MAX_TOOL_CALLS}-lookup cap.`);
+    if (calls >= maxToolCalls) {
+      lookupCapped = true;
+      core.warning(`${label} hit the ${maxToolCalls}-lookup cap.`);
       break;
     }
   }
@@ -250,8 +254,9 @@ export async function toolLoop(llm, { system, user, repo, config, turns, closing
   try {
     const text = await llm.complete([...messages, { role: 'user', content: closing }], { jsonMode: false });
     if (text.trim()) {
-      core.info(`${label} hit the ${turns}-turn cap after ${calls} lookup(s).`);
-      return { text: boundBriefing(text), turns, calls, capped: true };
+      const cap = lookupCapped ? `${maxToolCalls}-lookup cap` : `${turns}-turn cap`;
+      core.info(`${label} hit the ${cap} after ${calls} lookup(s).`);
+      return { text: boundBriefing(text), turns, calls, capped: true, lookupCapped };
     }
   } catch (err) {
     // The review can still use deterministic project rules and widened source;
@@ -289,7 +294,11 @@ Investigate, then produce the briefing.`;
     text: result.text,
     tokens: estimateTokens(result.text),
     stats: {
-      mode: result.capped ? 'agentic (turn cap reached)' : 'agentic',
+      mode: result.lookupCapped
+        ? 'agentic (lookup cap reached)'
+        : result.capped
+          ? 'agentic (turn cap reached)'
+          : 'agentic',
       agentTurns: result.turns,
       toolCalls: result.calls,
     },

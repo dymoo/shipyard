@@ -7,6 +7,7 @@ import {
   renderFile,
   buildChunks,
   assertCompleteReviewContext,
+  isFileCapSkip,
   sliceAround,
   estimateTokens,
 } from './context.js';
@@ -42,6 +43,12 @@ async function main() {
 
   core.info(`Reviewing ${ctx.owner}/${ctx.repo}#${ctx.prNumber} with ${config.model}`);
   core.info(`${files.length} changed files, ${selected.length} to review, ${skipped.length} skipped`);
+  const pastCap = skipped.filter(isFileCapSkip);
+  if (pastCap.length) {
+    core.warning(
+      `Diff has ${pastCap.length} file(s) past max-files (${config.maxFiles}); reviewing the first ${selected.length} in chunks and omitting the rest.`,
+    );
+  }
   assertCompleteReviewContext({ skipped });
 
   if (!selected.length) {

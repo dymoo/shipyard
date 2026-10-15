@@ -62,10 +62,14 @@ Ponytail. Planning skills stay in the local coding session and are never loaded
 by the cloud executor.
 
 The review action's public inputs are exactly `api-key`, `base-url`, `model`,
-`reasoning-effort`, `github-token`, `handoff-token`, `instructions` and `ignore`.
-When omitted, reasoning effort uses the provider default; an explicit validated
-value is sent unchanged. The released `dymoo/shipyard@v3` reference does not
-accept this new input; consumers must pin a supporting immutable revision until
+`reasoning-effort`, `github-token`, `handoff-token`, `instructions`, `ignore`,
+`max-tool-calls`, `request-timeout-minutes` and `max-files`. When omitted,
+reasoning effort uses the provider default; an explicit validated value is sent
+unchanged. The limit inputs default to 80 lookups, a 20-minute per-call
+deadline and 150 files. A diff past `max-files` is reviewed in chunks up to
+that cap; later files are omitted with a warning rather than failing the run.
+The released `dymoo/shipyard@v3` reference does not accept `reasoning-effort`
+or these limit inputs; consumers must pin a supporting immutable revision until
 it is released. The self-review workflow pins a supporting immutable revision
 and selects `deepseek/deepseek-v4.1-flash` with explicit `max` effort. Its dedicated
 `OPENROUTER_REVIEWER_API_KEY` is separate from the Coder's `LLM_API_KEY`;
@@ -158,7 +162,7 @@ it needs splitting.
 | File              | Owns                                                                     |
 | ----------------- | ------------------------------------------------------------------------ |
 | `src/index.js`    | Orchestration. No business logic.                                        |
-| `src/config.js`   | Seven inputs, fixed limits and event resolution                          |
+| `src/config.js`   | Public inputs, fixed limits and event resolution                         |
 | `src/handoff.js`  | HMAC proof for Coder/Reviewer dispatches                                 |
 | `src/prompts.js`  | Every prompt. The product's actual IP.                                   |
 | `src/schema.js`   | JSON Schemas for structured replies. Authoritative.                      |
@@ -291,6 +295,10 @@ Keep the diff to one purpose. If it does two things, it is two pull requests.
 
 ## Changelog
 
+- 2026-10-15: Made Reviewer lookup count, per-call deadline and file cap action
+  inputs. Defaults are 80 lookups, 20 minutes and 150 files. A diff past the
+  file cap is reviewed in chunks up to that cap and the remainder is omitted
+  with a warning. Released `@v3` does not accept the inputs.
 - 2026-08-04: Added the `setup-shipyard` local bootstrap skill. It verifies
   Matt's real workflows before configuring guarded Shipyard Actions and the
   target repository's agent contract, with preflight, exact canonical

@@ -101,3 +101,39 @@ test('the tool loop keeps assistant calls and tool results paired', async () => 
   assert.equal(assistant.tool_calls.length, 8);
   assert.equal(secondRequest.filter((message) => message.role === 'tool').length, 8);
 });
+
+test('a configured lookup cap stops the investigation and asks for the briefing', async () => {
+  let requests = 0;
+  const llm = {
+    send: async () => {
+      requests++;
+      return {
+        message: {
+          role: 'assistant',
+          content: null,
+          tool_calls: Array.from({ length: 10 }, (_, index) => ({
+            id: `call-${index}`,
+            type: 'function',
+            function: { name: 'list_files', arguments: '{}' },
+          })),
+        },
+      };
+    },
+    complete: async () => 'briefing after the cap',
+  };
+
+  const result = await toolLoop(llm, {
+    system: 'system',
+    user: 'user',
+    repo,
+    config: { ...config, maxToolCalls: 3 },
+    turns: 4,
+    closing: 'close',
+  });
+
+  assert.equal(requests, 1);
+  assert.equal(result.calls, 3);
+  assert.equal(result.lookupCapped, true);
+  assert.equal(result.capped, true);
+  assert.match(result.text, /briefing after the cap/);
+});

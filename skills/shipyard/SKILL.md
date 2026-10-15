@@ -73,9 +73,10 @@ Shipyard never auto-merges.
 ## Current release boundary
 
 Cloud Reviewer is released as `dymoo/shipyard@v3` and Cloud Coder as
-`dymoo/shipyard/cloud-coder@v4`. The unreleased Reviewer reasoning-effort input
-is not part of `@v3`; consumers using it must pin a supporting immutable
-revision until a separate release updates the tag. Merging main does not move
+`dymoo/shipyard/cloud-coder@v4`. The unreleased Reviewer inputs — `reasoning-effort`, `max-tool-calls`,
+`request-timeout-minutes` and `max-files` — are not part of `@v3`; consumers
+using them must pin a supporting immutable revision until a separate release
+updates the tag. Merging main does not move
 existing tags. Before applying `ready-for-agent`, confirm the repository has
 both workflows. Shipyard accepts their fixed repair hand-off only
 with a HMAC proof bound to the repository, direction, Issue, PR, repair round and exact

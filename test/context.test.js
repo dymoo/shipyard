@@ -8,6 +8,7 @@ import {
   renderFile,
   buildChunks,
   assertCompleteReviewContext,
+  isFileCapSkip,
   sliceAround,
   estimateTokens,
 } from '../src/context.js';
@@ -66,22 +67,25 @@ test('max-files is reported rather than silently applied', () => {
   assert.match(capped.skipped[0].reason, /max-files/);
 });
 
-test('review coverage fails closed for every non-ignored skipped file', () => {
+test('review coverage fails closed for missing evidence and warns past the file cap', () => {
   assert.doesNotThrow(() =>
     assertCompleteReviewContext({
       skipped: [{ path: 'pnpm-lock.yaml', reason: 'ignored' }],
     }),
   );
+  const capped = { path: 'later.js', reason: 'over max-files (150)' };
+  assert.equal(isFileCapSkip(capped), true);
+  assert.doesNotThrow(() => assertCompleteReviewContext({ skipped: [capped] }));
   assert.throws(
     () =>
       assertCompleteReviewContext({
         skipped: [
           { path: 'logo.png', reason: 'binary' },
           { path: 'rename-only.js', reason: 'no textual changes' },
-          { path: 'over-limit.js', reason: 'over max-files (60)' },
+          capped,
         ],
       }),
-    /logo\.png: binary[\s\S]*rename-only\.js: no textual changes[\s\S]*over-limit\.js: over max-files/,
+    /logo\.png: binary[\s\S]*rename-only\.js: no textual changes/,
   );
 });
 

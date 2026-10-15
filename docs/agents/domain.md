@@ -5,7 +5,7 @@ Shipyard is a GitHub Actions software factory with two coordinated components:
 session uses Matt Pocock's skills to create exceptionally well-defined work,
 queues it, and gives the final merge approval.
 
-`cloud-reviewer` source exposes an eight-input review action; released `@v3`
+`cloud-reviewer` source exposes an eleven-input review action; released `@v3`
 remains seven-input until a separate tag update. It performs a
 constrained, read-only model investigation. The reviewed repository is
 untrusted evidence: the action may list, read, and search its files, but must

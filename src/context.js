@@ -227,14 +227,21 @@ export function buildChunks(rendered, config) {
   return { chunks, dropped };
 }
 
+/** A file-count cap is a budget truncation, not missing evidence. */
+export function isFileCapSkip(item) {
+  return typeof item?.reason === 'string' && item.reason.startsWith('over max-files (');
+}
+
 /**
- * A green review must mean every non-ignored textual change reached the model.
- * The action used to report skipped/truncated/dropped material only in its
- * summary while still emitting reviewed=true. That makes the status unusable
- * as a required safety gate.
+ * A green review must mean every non-ignored textual change that was selected
+ * reached the model. Files past `max-files` are an explicit truncation: the
+ * selected prefix is still reviewed in chunks, and the remainder is warned
+ * rather than failing the run. Ignored paths stay intentional omissions.
+ * Binary files, empty hunks, truncated hunks and token-budget drops are still
+ * missing evidence, so those keep the run failed.
  */
 export function assertCompleteReviewContext({ skipped = [], rendered = [], dropped = [] }) {
-  const incomplete = skipped.filter((item) => item.reason !== 'ignored');
+  const incomplete = skipped.filter((item) => item.reason !== 'ignored' && !isFileCapSkip(item));
   const truncatedPaths = [...new Set(rendered.filter((block) => block.truncated).map((block) => block.path))];
   const failures = [
     ...incomplete.map((item) => `${item.path}: ${item.reason}`),

@@ -684,6 +684,33 @@ test('total token exhaustion fails before any model request or reviewed output',
   assert.deepEqual(run.outputs, {});
 });
 
+test('a diff past max-files is reviewed in chunks and the remainder is warned', async (t) => {
+  /** @type {Record<string, string>} */
+  const repoFiles = {};
+  const diffs = [];
+  for (const name of ['a.js', 'b.js', 'c.js']) {
+    repoFiles[name] = 'export const value = 1;\n';
+    diffs.push(addedFileDiff(name, 'export const value = 1;'));
+  }
+  const { server, captured, port } = await stubServer({
+    diffText: diffs.join('\n'),
+    repoFiles,
+  });
+  t.after(() => server.close());
+
+  const run = await runAction(port, { 'INPUT_MAX-FILES': '2' });
+  assert.equal(run.code, 0, `action failed:\n${run.stdout}\n${run.stderr}`);
+  assert.match(run.stdout, /past max-files \(2\)/);
+  assert.match(run.stdout, /reviewing the first 2 in chunks/);
+  assert.equal(run.outputs.reviewed, 'true');
+
+  const review = captured.llmRequests.find(isReview);
+  assert.match(review.messages[1].content, /FILE: a\.js/);
+  assert.match(review.messages[1].content, /FILE: b\.js/);
+  assert.doesNotMatch(review.messages[1].content, /FILE: c\.js/);
+  assert.match(captured.createdComments[0].body, /`c\.js` — over max-files \(2\)/);
+});
+
 test('an ignored-only change remains visible in the successful sticky summary', async (t) => {
   const { server, captured, port } = await stubServer({
     diffText: addedFileDiff('pnpm-lock.yaml', 'lockfileVersion: 9'),

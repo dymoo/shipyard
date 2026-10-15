@@ -3,7 +3,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { readConfig, readEvent, containsPhrase, extractFocus } from '../src/config.js';
+import {
+  readConfig,
+  readEvent,
+  containsPhrase,
+  extractFocus,
+  DEFAULT_MAX_TOOL_CALLS,
+  DEFAULT_REQUEST_TIMEOUT_MINUTES,
+  DEFAULT_MAX_FILES,
+} from '../src/config.js';
 import { createHandoffProof } from '../src/handoff.js';
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'shipyard-event-'));
@@ -134,7 +142,7 @@ test('trigger matching has a boundary and focus is bounded', () => {
   assert.equal(extractFocus('@shipyard'), '');
 });
 
-test('configuration has eight public inputs and no URL fallback', () => {
+test('configuration has eleven public inputs and no URL fallback', () => {
   const values = {
     'INPUT_API-KEY': 'model-secret',
     'INPUT_BASE-URL': 'https://models.example/v1///',
@@ -151,9 +159,30 @@ test('configuration has eight public inputs and no URL fallback', () => {
   assert.equal(config.githubApiUrl, 'https://github.example/api/v3');
   assert.equal(config.instructions, 'Use integer pence.');
   assert.equal(config.reasoningEffort, 'high');
-  assert.equal(config.requestTimeoutMs, 600000);
+  assert.equal(config.maxToolCalls, DEFAULT_MAX_TOOL_CALLS);
+  assert.equal(config.maxFiles, DEFAULT_MAX_FILES);
+  assert.equal(config.requestTimeoutMs, DEFAULT_REQUEST_TIMEOUT_MINUTES * 60 * 1000);
   assert.equal(config.handoffToken, 'handoff-secret');
   assert.ok(config.ignore.includes('private/**'));
+
+  const raised = withEnv(
+    {
+      ...values,
+      'INPUT_MAX-TOOL-CALLS': '120',
+      'INPUT_REQUEST-TIMEOUT-MINUTES': '45',
+      'INPUT_MAX-FILES': '200',
+    },
+    readConfig,
+  );
+  assert.equal(raised.maxToolCalls, 120);
+  assert.equal(raised.requestTimeoutMs, 45 * 60 * 1000);
+  assert.equal(raised.maxFiles, 200);
+  assert.throws(() => withEnv({ ...values, 'INPUT_MAX-FILES': '0' }, readConfig), /max-files.*1 to 500/);
+  assert.throws(() => withEnv({ ...values, 'INPUT_MAX-TOOL-CALLS': '501' }, readConfig), /max-tool-calls/);
+  assert.throws(
+    () => withEnv({ ...values, 'INPUT_REQUEST-TIMEOUT-MINUTES': 'twenty' }, readConfig),
+    /request-timeout-minutes/,
+  );
 
   const withoutReasoningEffort = { ...values };
   delete withoutReasoningEffort['INPUT_REASONING-EFFORT'];
@@ -184,7 +213,7 @@ test('configuration has eight public inputs and no URL fallback', () => {
   );
 });
 
-test('action metadata exposes only the eight supported inputs', () => {
+test('action metadata exposes only the eleven supported inputs', () => {
   const action = fs.readFileSync(new URL('../action.yml', import.meta.url), 'utf8');
   const inputBlock = action.slice(action.indexOf('inputs:'), action.indexOf('\noutputs:'));
   const names = [...inputBlock.matchAll(/^ {2}([a-z-]+):$/gm)].map((match) => match[1]);
@@ -197,8 +226,20 @@ test('action metadata exposes only the eight supported inputs', () => {
     'handoff-token',
     'instructions',
     'ignore',
+    'max-tool-calls',
+    'request-timeout-minutes',
+    'max-files',
   ]);
+  assert.equal(actionDefault(inputBlock, 'max-tool-calls'), String(DEFAULT_MAX_TOOL_CALLS));
+  assert.equal(actionDefault(inputBlock, 'request-timeout-minutes'), String(DEFAULT_REQUEST_TIMEOUT_MINUTES));
+  assert.equal(actionDefault(inputBlock, 'max-files'), String(DEFAULT_MAX_FILES));
   assert.match(inputBlock, /base-url:\n {4}description:[^\n]+\n {4}required: true/);
   assert.match(inputBlock, /reasoning-effort:\n {4}description:[^\n]+\n {4}required: false/);
   assert.ok(!inputBlock.includes('https://api.openai.com'));
 });
+
+function actionDefault(inputBlock, name) {
+  const match = new RegExp(`^ {2}${name}:\\n(?: {4}.+\\n)*? {4}default: '([^']*)'`, 'm').exec(inputBlock);
+  assert.ok(match, `${name} default`);
+  return match[1];
+}
