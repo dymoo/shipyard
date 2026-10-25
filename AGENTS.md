@@ -122,12 +122,17 @@ It reads its Coder low/high model tiers and optional reasoning efforts from
 repository Variables, plus the shared hand-off secret and digest-pinned Node 20
 sandbox image. Shipyard's pilot Agent Briefs use `npm test`; a consumer whose Brief
 declares another command must publish a test-toolchain image and pass that
-image's immutable digest instead. Cloud Coder and Cloud Reviewer run on the ARC
-release-name label `shipyard-runners`. That runner is dedicated,
+image's immutable digest instead. This public repository runs its own Cloud
+Coder and Cloud Reviewer on GitHub-hosted `ubuntu-latest`: free here, a fresh VM
+per job, and Docker included. Each job starts only for a trusted actor: the
+owner labels an Issue, or an OWNER/MEMBER/COLLABORATOR opens the pull request or
+writes the `@shipyard` comment; repository dispatches need a write token and a
+valid HMAC proof. The examples still target the ARC release-name label
+`shipyard-runners` for private consumers. Such a runner is dedicated,
 repository-scoped infrastructure with Docker; it receives model and GitHub
-credentials and must not be shared with unrelated untrusted workloads. Ordinary
-CI remains on GitHub-hosted runners. A non-ARC install must replace the example
-label with its own dedicated runner label.
+credentials and must not be shared with unrelated untrusted workloads. A
+non-ARC install must replace the example label with its own dedicated runner
+label.
 
 ## Agent skills
 
@@ -291,6 +296,10 @@ Keep the diff to one purpose. If it does two things, it is two pull requests.
 
 ## Changelog
 
+- 2026-10-17: Moved Shipyard's own Coder and Reviewer workflows from the
+  self-hosted `shipyard-runners` set to GitHub-hosted `ubuntu-latest`, added a
+  job-level trusted-actor gate before any secret is used, and moved write
+  permissions from workflow to job scope. Examples keep the ARC label.
 - 2026-08-04: Added the `setup-shipyard` local bootstrap skill. It verifies
   Matt's real workflows before configuring guarded Shipyard Actions and the
   target repository's agent contract, with preflight, exact canonical

@@ -10,12 +10,7 @@ on:
   repository_dispatch:
     types: [shipyard-review]
 
-permissions:
-  # Repository dispatch requires contents: write. Shipyard never exposes this
-  # token to the model and uses it only for the fixed repair hand-off.
-  contents: write
-  issues: write
-  pull-requests: write
+permissions: {}
 
 concurrency:
   group: shipyard-review-${{ github.event.pull_request.number || github.event.issue.number || github.event.client_payload.pull_request }}
@@ -23,13 +18,32 @@ concurrency:
 
 jobs:
   review:
+    # Trust gate: the job, and with it every secret, starts only for the
+    # repository owner or an OWNER/MEMBER/COLLABORATOR pull-request author or
+    # commenter. repository_dispatch needs a token with contents: write, and
+    # the action rejects it without a valid HMAC hand-off proof. Any other
+    # event matches no branch and is skipped.
     if: >-
       vars.OPENROUTER_REVIEWER_ENABLED == 'true' &&
       ((github.event_name == 'pull_request_target' &&
-        !startsWith(github.event.pull_request.head.ref, 'shipyard/issue-')) ||
+        !startsWith(github.event.pull_request.head.ref, 'shipyard/issue-') &&
+        (contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association) ||
+         github.actor == github.repository_owner)) ||
        (github.event_name == 'repository_dispatch' && github.event.action == 'shipyard-review') ||
-       (github.event.issue.pull_request && contains(github.event.comment.body, '@shipyard')))
-    runs-on: shipyard-runners
+       (github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request &&
+        contains(github.event.comment.body, '@shipyard') &&
+        (contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) ||
+         github.actor == github.repository_owner)))
+    # Public repository: GitHub-hosted minutes are free, and each job gets a
+    # fresh VM instead of a shared self-hosted runner.
+    runs-on: ubuntu-latest
+    permissions:
+      # Repository dispatch requires contents: write. Shipyard never exposes this
+      # token to the model and uses it only for the fixed repair hand-off.
+      contents: write
+      issues: write
+      pull-requests: write
     steps:
       - uses: dymoo/shipyard@efec252b39c55bc3d902d14d59286660046f9776
         with:

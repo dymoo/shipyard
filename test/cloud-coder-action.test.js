@@ -50,7 +50,9 @@ test('the Shipyard pilot workflow routes only ready Issues through a pinned Node
   assert.match(workflow, /vars\.SHIPYARD_CODER_READY == 'true'/);
   assert.match(workflow, /low-complexity-model: \$\{\{ vars\.SHIPYARD_CODER_LOW_COMPLEXITY_MODEL \}\}/);
   assert.match(workflow, /high-complexity-model: \$\{\{ vars\.SHIPYARD_CODER_HIGH_COMPLEXITY_MODEL \}\}/);
-  assert.match(workflow, /runs-on: shipyard-runners/);
+  assert.match(workflow, /runs-on: ubuntu-latest/);
+  assert.match(workflow, /github\.event\.sender\.login == github\.repository_owner/);
+  assert.match(workflow, /^permissions: \{\}$/m);
   assert.match(workflow, /sandbox-image: node:20-bookworm-slim@sha256:[a-f0-9]{64}/);
   assert.match(workflow, /handoff-token: \$\{\{ secrets\.SHIPYARD_HANDOFF_TOKEN \}\}/);
 
@@ -60,6 +62,17 @@ test('the Shipyard pilot workflow routes only ready Issues through a pinned Node
   assert.match(example, /vars\.SHIPYARD_CODER_LOW_COMPLEXITY_MODEL != ''/);
   assert.match(example, /vars\.SHIPYARD_CODER_HIGH_COMPLEXITY_MODEL != ''/);
   assert.match(example, /github\.event\.issue\.state == 'open'/);
+});
+
+test("Shipyard's own reviewer starts only for trusted actors on a hosted runner", () => {
+  const workflow = fs.readFileSync(new URL('../.github/workflows/shipyard-reviewer.yml', import.meta.url), 'utf8');
+  const trusted = `contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.`;
+  assert.ok(workflow.includes(`${trusted}pull_request.author_association)`));
+  assert.ok(workflow.includes(`${trusted}comment.author_association)`));
+  assert.match(workflow, /github\.event_name == 'issue_comment' &&/);
+  assert.match(workflow, /runs-on: ubuntu-latest/);
+  assert.match(workflow, /^permissions: \{\}$/m);
+  assert.doesNotMatch(workflow, /shipyard-runners|actions\/checkout/);
 });
 
 test('dispatches only when ready-for-agent labels an Issue', (t) => {
