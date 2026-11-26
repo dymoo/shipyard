@@ -131,6 +131,11 @@ label with its own dedicated runner label.
 
 ## Agent skills
 
+- Gufo: read the `gufo` skill before changing model calls, scheduled inference,
+  batches, retries or inference telemetry; default deferrable work to Batch when
+  supported. Canonical source: `dymoo/dylans-skills`,
+  `collections/workstation/skills/gufo/SKILL.md`.
+
 - **Issue tracker:** GitHub Issues in `dymoo/shipyard`. See
   `docs/agents/issue-tracker.md` for the operating model.
 - **Triage labels:** Use the canonical Matt Pocock labels documented in
